@@ -6,7 +6,7 @@ import myEncrypt # 用于加密密码
 import time # 生成时间戳
 import configparser # 读取配置文件
 from urllib.parse import urlencode # 用于编码请求体
-from tj_sql import sqlInsertEvent, sqlHaveRecorded, SqlInsertAttachment, SQlInsertRelation  # 用于写入数据库
+from tjSql import sqlInsertNotification, sqlHaveRecorded, SqlInsertAttachment, SQlInsertRelation  # 用于写入数据库
 
 # 读取配置文件
 CONFIG = configparser.ConfigParser()
@@ -46,7 +46,7 @@ def login():
 
     # 获取 authnLcKey
     authnLcKey = response.url.split('=')[-1] # 从 URL 中提取 authnLcKey，从后往前找到第一个等号，取等号后的部分
-    print(authnLcKey)
+    # print(authnLcKey)
 
     # ----- 第二步：ActionAuthChain ----- #
 
@@ -135,7 +135,7 @@ def login():
     if response.status_code == 200:
         print("登录成功！")
         # print("当前链接", response.url) # 输出 URL
-        # print(session.cookies) # 输出 cookies
+        print(session.cookies) # 输出 cookies
         # print(session.headers) # 输出 headers
         return session
     else:
@@ -189,8 +189,9 @@ def findCommonMsgPublishById(session, id):
 def handleDownloadfile(session, attachment):
     # 生成下载链接
     download_url = f"https://1.tongji.edu.cn/api/commonservice/obsfile/downloadfile?objectkey="
+
     # 对文件名进行加密
-    remotefilePath = myEncrypt.encryptFilePath(attachment['filePath'])
+    remotefilePath = myEncrypt.encryptFilePath(attachment['fileLacation']) # 要和返回的 key 对应，不要乱起名
 
     download_url += remotefilePath
 
@@ -198,50 +199,45 @@ def handleDownloadfile(session, attachment):
     response = session.get(download_url)
 
     # 保存到本地
-    localFilePath = STORE_PATH + "/" + attachment['fileName']
+    localFilePath = STORE_PATH + "/" + attachment['fileName'] # 要和返回的 key 对应，不要乱起名
 
     with open(localFilePath, "wb") as f:
         f.write(response.content)
 
-    return localFilePath
+    return localFilePath.replace(STORE_PATH + "/", "") # 返回相对路径
     
 
 # 处理活动，写入数据库
 # events 是一个列表，每个元素是一个活动
 def processEvents(session, events):
     # 测试
+    print("开始处理活动！")
     for event in events:
+        print("处理活动：", event['id'])
+        print("活动标题：", event['title'])
         if (sqlHaveRecorded(event['id'])): # 如果已经记录过了
             continue
         else:
             # 获取活动的具体内容
             event = findCommonMsgPublishById(session, event['id'])
-            sqlInsertEvent(event)
+            sqlInsertNotification(event)
+            print("插入通知成功！")
 
             # 处理附件
+            # 注意，1 系统的 findMyCommonMsgPublish 返回的附件列表永远是 null
+            # 必须 ById 才能获取附件
             if (event['commonAttachmentList'] != None):
                 for attachment in event['commonAttachmentList']:
                     localFilePath = handleDownloadfile(session, attachment)
                     SqlInsertAttachment(attachment, localFilePath)
+                    print("插入附件成功！")
                     SQlInsertRelation(event['id'], attachment['id'])
+                    print("插入关系成功！")
                     time.sleep(5) # 不要频繁请求
             
 
+session = login()
 
-# login()
-# events = findMyCommonMsgPublish(login())
+events = findMyCommonMsgPublish(session)
 
-# 调试，本地读取文件
-# with open("response.json", "r") as f:
-    # events = f.read()
-
-# 转换为 JSON，模拟获取到的 response.json()['data']['list']
-
-import json
-
-# events = json.loads(events)['data']['list']
-
-# 调试
-# print(events)
-
-# processEvents(events)
+processEvents(session, events)

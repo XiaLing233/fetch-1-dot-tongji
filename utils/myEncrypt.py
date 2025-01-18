@@ -103,17 +103,4 @@ def encryptFilePath(filePath):
 
     return cipher_text # 返回 URI 编码后的密文
 
-# 调试
-
-# getAESKeyAndIV()
-
-
-# val = "/api/commonservice/obsfile/downloadfile?objectkey=" + encryptFilePath("face/file/20250117115629105628_同济大学第二届中华美育大赛通知new.pdf")
-
-# if ("/api/commonservice/obsfile/downloadfile?objectkey=zxegBMG%2Br5h2jLTwimMTDofu9Rs7Kk%2BmvGQyEi462aYpfVJsMlVUA63qfQd3LlZcqnCtIM%2FsjB0MNzEE0avajJC77UrvGpkjiLLTdDXVhGxVYu%2B34saJLWMDemuXYI0mAJnbOGKPIOsPg8RUWT9InjKPpMy8n1wnsoTmSQ8rDgDGVDUDZMabRlEE0P3BjSCtZeR500Ns%2FOcayGhUmbZcl5lSNacBRYHkOslMS%2FD4cHsEC5iXC5CIpawnvbwoiekE" == val):
-#     print("Test Passed")
-# else:
-#     print("Test Failed")
-
-# print(val)
     

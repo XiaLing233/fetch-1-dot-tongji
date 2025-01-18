@@ -54,6 +54,40 @@ function encryptByRSA(message) {
 
 ### 数据库表格的设置
 
+数据库表格的设置（采用下划线命名法）：
+
+> 通知表(notifications)
+
+| 关键字 | 类型 | 描述 | 补充说明 |
+| --- | --- | --- | --- |
+| id | INT | 通知的唯一标识符 | 和 1 系统数据库中的一致 |
+| title | VARCHAR(500) | 通知的标题 | |
+| content | LONGTEXT | 通知的内容(HTML) | 用 LONGTEXT，不然存不下 base64 的图片 |
+| start_time | DATETIME | 通知的发布时间 | 用 DATETIME 而不是 TIMESTAMP... |
+| end_time | DATETIME | 通知的下架时间 | ...是因为 DATETIME 不考虑时区... |
+| invalid_top_time | DATETIME | 什么时候停止置顶 | ...不过主要还是因为和 1 系统的一致 |
+| created_id | VARCHAR(45)| 发布人的工号 | 不能用 INT，否则存储不了 admin，且 0 开头的工号会略去首 0 |
+| created_user | VARCHAR(45) | 发布人的姓名 | |
+| create_time | DATETIME | 通知的创建时间 | |
+| publish_time | DATETIME | 通知的发布时间 | |
+
+> 附件表(attachments)
+
+| 关键字 | 类型 | 描述 | 补充说明 |
+| --- | --- | --- | --- |
+| id | INT | 附件的唯一标识符 |和 1 系统数据库中的一致 |
+| file_name | VARCHAR(500) | 附件文件名 | json 中的 fileName |
+| file_location_remote | VARCHAR(500) | 在学校服务器的路径 | json 中的 fileLocation |
+| file_location_local | VARCHAR(500) | 本地的存储路径 | 不包含前缀地址，即 config.ini 中的 Storage.path |
+
+> 通知和附件的关系表(relations)
+
+| 关键字 | 类型 | 描述 | 补充说明 |
+| --- | --- | --- | --- |
+| id | INT | 主键 | 它的数值不重要 |
+| notification_id | INT | 存放通知 | |
+| attachment_id | INT | 存放附件 | |
+
 ### 内容的爬取与存储
 
 #### 爬取
@@ -217,31 +251,9 @@ e.encrypt = function(e) {
 
 #### 存储
 
-数据库表格的设置（采用下划线命名法）：
+在数据库表格（见上）中存储信息和关系，参见 `tjSql.py`。
 
-1. 通知表(notifications)
-    * id：通知的唯一标识符。
-    * title：通知的标题。
-    * content：通知的内容，可能需要存储 HTML 格式的内容。
-    * start_time：通知的发布时间。
-    * end_time：通知的下架时间。
-    * invalid_top_time: 什么时候停止置顶
-    * status：通知的状态（例如发布、撤回等）。
-    * created_id：发布人的工号。
-    * created_user：发布人的姓名。
-    * create_time：通知的创建时间。
-    * publish_time：通知的发布时间。
-
-2. 附件表(attachments)
-    * id：附件的唯一标识符。
-    * file_name：附件文件名。
-    * file_location：附件的存储路径（文件地址），存储附件的实际位置。
-    * upload_time：附件的上传时间。
-
-3. 通知和附件的关系表(relations)
-    * id：主键
-    * notification_id：存放通知
-    * attachment_id：存放附件
+在本地文件夹存储文件。参见 `fetchNewEvents.py`。
 
 ### 用户注册与登录的功能
 
