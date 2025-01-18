@@ -56,6 +56,8 @@ function encryptByRSA(message) {
 
 ### 内容的爬取与存储
 
+#### 爬取
+
 获取消息列表 `findMyCommonMsgPublish`，后端返回的数据格式为：
 
 ```json
@@ -212,6 +214,34 @@ e.encrypt = function(e) {
 ```
 
 > 注意：`AES` 加密是对称加密，因此不要公开秘钥和初始向量！！！
+
+#### 存储
+
+数据库表格的设置（采用下划线命名法）：
+
+1. 通知表(notifications)
+    * id：通知的唯一标识符。
+    * title：通知的标题。
+    * content：通知的内容，可能需要存储 HTML 格式的内容。
+    * start_time：通知的发布时间。
+    * end_time：通知的下架时间。
+    * invalid_top_time: 什么时候停止置顶
+    * status：通知的状态（例如发布、撤回等）。
+    * created_id：发布人的工号。
+    * created_user：发布人的姓名。
+    * create_time：通知的创建时间。
+    * publish_time：通知的发布时间。
+
+2. 附件表(attachments)
+    * id：附件的唯一标识符。
+    * file_name：附件文件名。
+    * file_location：附件的存储路径（文件地址），存储附件的实际位置。
+    * upload_time：附件的上传时间。
+
+3. 通知和附件的关系表(relations)
+    * id：主键
+    * notification_id：存放通知
+    * attachment_id：存放附件
 
 ### 用户注册与登录的功能
 
