@@ -76,3 +76,27 @@ PySocks           |     1.7.1      | √ |
 requests          |     2.32.3     | √ |
 setuptools        |     65.5.0     | |
 urllib3           |     2.3.0      | |
+
+
+## api
+
+### '/api/login'
+
+> 传入：
+
+```json
+{
+    "xl_username": "admin@tongji.edu.cn",
+    "xl_password": "RSA加密后的密码"
+}
+```
+
+> 返回
+
+```json
+{
+    "code": 200,
+    "msg": "成功",
+    "xl_token": "12345"
+}
+```

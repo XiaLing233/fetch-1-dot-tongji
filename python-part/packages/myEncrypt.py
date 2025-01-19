@@ -57,6 +57,7 @@ def getspAuthChainCode(response_text):
     return None
     
 # 把密码用 RSA 加密，公钥是 auth_key
+# 原始密码(str) -> 字节串(bytes) -> RSA加密(bytes) -> base64编码(bytes) -> 最终字符串(str)
 def encryptPassword():
     auth_key = getRSAPublicKey()
 

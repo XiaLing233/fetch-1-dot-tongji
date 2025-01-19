@@ -279,3 +279,11 @@ def sqlFindMyCommonMsgPublishById(notification_id):
 
     return notification_data
     
+
+
+# ----- 用户注册登录部分 ----- #
+
+# 查询用户是否存在
+def sqlUserExist(userName):
+    pass
+

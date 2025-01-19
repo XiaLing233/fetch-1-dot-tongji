@@ -2,11 +2,11 @@
 # 并将其存储到本地
 
 import requests # 用于发送 HTTP 请求
-import myEncrypt # 用于加密密码
+from packages import myEncrypt # 用于加密密码
 import time # 生成时间戳
 import configparser # 读取配置文件
 from urllib.parse import urlencode # 用于编码请求体
-from tjSql import sqlInsertNotification, sqlHaveRecorded, SqlInsertAttachment, SQlInsertRelation  # 用于写入数据库
+from packages.tjSql import sqlInsertNotification, sqlHaveRecorded, SqlInsertAttachment, SQlInsertRelation  # 用于写入数据库
 
 # 读取配置文件
 CONFIG = configparser.ConfigParser()

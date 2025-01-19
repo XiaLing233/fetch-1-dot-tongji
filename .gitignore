@@ -3,7 +3,7 @@ config.ini
 __pycache__
 node_modules
 
-# 后端文件有安全问题，等我想好如何处理敏感信息后再上传
-1-backend/
+keys/
+
 # 前端没写好呢，先不上传
 1-frontend/

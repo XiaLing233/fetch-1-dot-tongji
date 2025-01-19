@@ -2,5 +2,6 @@
 data/
 # 调试文件
 response.json
+testemail.py
 # Cookie
 cookies.json
