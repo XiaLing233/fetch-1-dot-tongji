@@ -12,6 +12,16 @@ from tjSql import sqlInsertNotification, sqlHaveRecorded, SqlInsertAttachment, S
 CONFIG = configparser.ConfigParser()
 CONFIG.read('config.ini')
 
+# 代理
+HTTP_PROXY = CONFIG['Proxy']['http']
+HTTPS_PROXY = CONFIG['Proxy']['https']
+
+# 配置 SOCKS5 代理
+PROXIES = {
+    'http': HTTP_PROXY,
+    'https': HTTPS_PROXY
+}
+
 # 存储文件的路径
 STORE_PATH = CONFIG['Storage']['path'] # 末尾没有斜杠
 
@@ -42,7 +52,7 @@ def login():
     session = requests.Session()
     session.headers.update(headers)
 
-    response = session.get(entry_url)
+    response = session.get(entry_url, proxies=PROXIES)
 
     # 获取 authnLcKey
     authnLcKey = response.url.split('=')[-1] # 从 URL 中提取 authnLcKey，从后往前找到第一个等号，取等号后的部分
@@ -72,13 +82,13 @@ def login():
         }
     )
 
-    response = session.post(chain_url, data=login_data, allow_redirects=False)
+    response = session.post(chain_url, data=login_data, allow_redirects=False, proxies=PROXIES)
 
     # ----- 第三步：AuthnEngine ----- #
 
     auth_url = "https://iam.tongji.edu.cn/idp/AuthnEngine?currentAuth=urn_oasis_names_tc_SAML_2.0_ac_classes_BAMUsernamePassword&authnLcKey=" + authnLcKey + "&entityId=SYS20230001"
 
-    response = session.post(auth_url, data=login_data, allow_redirects=False)
+    response = session.post(auth_url, data=login_data, allow_redirects=False, proxies=PROXIES)
 
     # ----- 第四步：SSO 登录 ----- #
 
@@ -95,25 +105,25 @@ def login():
     session.headers.clear() # 记得清空 headers，因为有 Content-Type 等不需要的字段
     session.headers.update(sso_headers)
 
-    response = session.get(sso_url, allow_redirects=False)
+    response = session.get(sso_url, allow_redirects=False, proxies=PROXIES)
 
     # ----- 第五步：LoginIn code & state----- #
 
     loginIn_url = response.headers['Location']
 
-    response = session.get(loginIn_url, allow_redirects=False)
+    response = session.get(loginIn_url, allow_redirects=False, proxies=PROXIES)
 
     # ----- 第六步：ssologin token----- #
 
     ssologin_url = response.headers['Location']
 
-    response = session.get(ssologin_url, allow_redirects=False)
+    response = session.get(ssologin_url, allow_redirects=False, proxies=PROXIES)
 
     # ----- 第七步：转 HTTPS ----- #
 
     https_url = response.headers['Location']
 
-    response = session.get(https_url, allow_redirects=False)
+    response = session.get(https_url, allow_redirects=False, proxies=PROXIES)
 
     # ----- 第八步：https://1.tongji.edu.cn/api/sessionservice/session/login ----- #
 
@@ -129,7 +139,7 @@ def login():
 
     # 发送请求
 
-    response = session.post(login_url, data=login_req_body)
+    response = session.post(login_url, data=login_req_body, proxies=PROXIES)
 
     # 打印结果
     if response.status_code == 200:
@@ -157,7 +167,7 @@ def findMyCommonMsgPublish(session):
     # 发送请求
     msg_url = "https://1.tongji.edu.cn/api/commonservice/commonMsgPublish/findMyCommonMsgPublish"
 
-    response = session.post(msg_url, data=req_body)
+    response = session.post(msg_url, data=req_body, proxies=PROXIES)
 
     if (response.status_code == 200):
         print("请求成功！")
@@ -175,7 +185,7 @@ def findCommonMsgPublishById(session, id):
     # * 1000 是为了转换为毫秒级时间戳
     req_url = f"https://1.tongji.edu.cn/api/commonservice/commonMsgPublish/findCommonMsgPublishById?id={ id }&t={ int(time.time() * 1000) }"
 
-    response = session.get(req_url)
+    response = session.get(req_url, proxies=PROXIES)
 
     if (response.status_code == 200):
         print("请求成功！")
@@ -196,7 +206,7 @@ def handleDownloadfile(session, attachment):
     download_url += remotefilePath
 
     # 下载附件
-    response = session.get(download_url)
+    response = session.get(download_url, proxies=PROXIES)
 
     # 保存到本地
     localFilePath = STORE_PATH + "/" + attachment['fileName'] # 要和返回的 key 对应，不要乱起名
@@ -222,6 +232,7 @@ def processEvents(session, events):
             event = findCommonMsgPublishById(session, event['id'])
             sqlInsertNotification(event)
             print("插入通知成功！")
+            time.sleep(2) # 不要频繁请求
 
             # 处理附件
             # 注意，1 系统的 findMyCommonMsgPublish 返回的附件列表永远是 null
@@ -235,6 +246,28 @@ def processEvents(session, events):
                     print("插入关系成功！")
                     time.sleep(5) # 不要频繁请求
             
+
+
+
+# ----- 测试环境 ----- #
+
+# 记录 dump Cookie
+# import json
+# with open("cookies.json", "w") as f:
+    # json.dump(session.cookies.get_dict(), f)
+
+# session = requests.Session()
+
+# 读取 dump Cookie
+# with open("cookies.json", "r") as f:
+    # cookies = json.load(f)
+    # session.cookies.update(cookies)
+
+# events = findMyCommonMsgPublish(session)
+
+# processEvents(session, events)
+
+# ----- 生产环境 ----- #
 
 session = login()
 

@@ -4,7 +4,7 @@ import configparser # 读取配置文件
 
 # 读取配置文件
 CONFIG = configparser.ConfigParser()
-CONFIG.read('config.ini')
+CONFIG.read('config.ini', encoding='utf-8')
 
 # 设置数据库连接
 DB_HOST = CONFIG['Sql']['host']
@@ -278,8 +278,4 @@ def sqlFindMyCommonMsgPublishById(notification_id):
     print("查询到的通知是：", notification_data)
 
     return notification_data
-
     
-# sqlFindMyCommonMsgPublish()
-# sqlFindAttachmentByNotificationId(2204)
-# sqlFindMyCommonMsgPublishById(2191)
