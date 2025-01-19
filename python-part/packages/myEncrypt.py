@@ -88,11 +88,11 @@ def getAESKeyAndIV():
         if "i=n.enc.Utf8.parse" in line:
             key = line.split("\"")[1]
 
-    return iv, key # 返回的是 utf-8 编码的 str
+    return iv, key # 返回的是 ASCII 编码的 str
 
 # 对数据进行 AES 加密
 def encryptFilePath(filePath):
-    iv, key = getAESKeyAndIV() # 现在得到的是 utf-8 编码的 str
+    iv, key = getAESKeyAndIV() # 现在得到的是 ASCII 编码的 str
 
     # print(filePath)
     # 把 filePath 进行 URI 编码，使用 quote_plus 以确保 / 被编码为 %2F

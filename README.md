@@ -195,7 +195,7 @@ function encryptByRSA(message) {
         "relationId": 2204, // 和通知 id 的关系
         "relationType": "01",
         "fileName": "xxx",  // 文件名
-        "fileLacation": "xxx", // 文件存放地址，需要进行加密后发送下载请求
+        "fileLacation": "xxx", // 文件存放地址，需要进行加密后发送下载请求。就是 Lacation!
         "uploadUserId": null,
         "uploadName": null,
         "uploadTime": null,

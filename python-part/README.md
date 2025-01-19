@@ -65,22 +65,63 @@ pip 版本是 23.1.2，升级之后可能有问题，导入包会失效..玄学
 
 Package     |           Version | 手动 pip 安装? |
 -------------|------------------- | -------- |
-certifi           |     2024.12.14 | |
-charset-normalizer |     3.4.1      |  |
-configparser      |     7.1.0      | √ |
-idna              |     3.10       | |
-mysql-connector-python | 9.1.0     | √ |
-pip               |     23.1.2     | |
-pycryptodome      |     3.21.0     | √ |
-PySocks           |     1.7.1      | √ |
-requests          |     2.32.3     | √ |
-setuptools        |     65.5.0     | |
-urllib3           |     2.3.0      | |
-
+argon2-cffi | 23.1.0 | √ |
+argon2-cffi-bindings | 21.2.0 | |
+blinker | 1.9.0 | |
+certifi | 2024.12.14 | |
+cffi | 1.17.1 | |
+charset-normalizer | 3.4.1 | |
+click | 8.1.8 | |
+colorama | 0.4.6 | |
+configparser | 7.1.0 | √ |
+Flask | 3.1.0 | √ |
+Flask-Cors | 5.0.0 | √ |
+Flask-JWT-Extended | 4.7.1 | √ |
+Flask-Mail | 0.10.0 | √ |
+idna | 3.10 | |
+itsdangerous | 2.2.0 | |
+Jinja2 | 3.1.5 | |
+MarkupSafe | 3.0.2 | |
+mysql-connector-python | 9.1.0 | √ |
+pip | 23.1.2 | |
+pycparser | 2.22 | |
+pycryptodome | 3.21.0 | √ |
+PyJWT | 2.10.1 | |
+PySocks | 1.7.1 | √ |
+requests | 2.32.3 | √ |
+setuptools | 65.5.0 | |
+urllib3 | 2.3.0 | |
+Werkzeug | 3.1.3 | |
 
 ## api
 
+### '/api/register'
+
+`POST`
+
+> 传入：
+
+```json
+{
+    "xl_username": "admin@tongji.edu.cn",
+    "xl_password": "RSA加密后的密码",
+    "xl_veri_code": "233333"
+}
+```
+
+> 返回
+
+```json
+{
+    "code": 200,
+    "msg": "成功",
+    "xl_token": "12345"
+}
+```
+
 ### '/api/login'
+
+`POST`
 
 > 传入：
 
@@ -100,3 +141,183 @@ urllib3           |     2.3.0      | |
     "xl_token": "12345"
 }
 ```
+
+### '/api/recovery'
+
+`POST`
+
+> 传入：
+
+```json
+{
+    "xl_username": "admin@tongji.edu.cn",
+    "xl_password": "RSA加密后的密码"
+}
+```
+
+> 返回
+
+```json
+{
+    "code": 200,
+    "msg": "成功",
+    "xl_token": "12345"
+}
+```
+
+### '/api/sendVerificationEmail'
+
+`POST`
+
+> 传入：
+
+```json
+{
+    "xl_username": "admin@tongji.edu.cn",
+}
+```
+
+> 返回
+
+```json
+{
+    "code": 200,
+    "msg": "成功",
+}
+```
+
+### '/api/sendRecoveryEmail'
+
+`POST`
+
+> 传入：
+
+```json
+{
+    "xl_username": "admin@tongji.edu.cn",
+}
+```
+
+> 返回
+
+```json
+{
+    "code": 200,
+    "msg": "成功",
+}
+```
+
+### 以下需要验证 token
+
+### '/api/changePassword'
+
+`POST`
+
+> 传入：
+
+```json
+{
+    "xl_username": "admin@tongji.edu.cn",
+    "xl_newpassword": "加密后的新密码"
+}
+```
+
+> 返回
+
+```json
+{
+    "code": 200,
+    "msg": "成功",
+}
+```
+
+### '/api/findMyCommonMsgPublish'
+
+`POST`
+
+> 传入：
+
+```json
+{
+    "_pageNum": 1,
+    "_pageSize": 20
+}
+```
+
+> 返回
+
+```json
+{
+    "code": 200,
+    "msg": "成功",
+    "data": [
+        {
+        "id": 2204,
+        "title": "关于2024-2025学年第二学期本科生、研究生及继续教育（本科）教材选用情况的公示",
+        "startTime": "2025-01-15 00:00:00.0",
+        "endTime": "2025-01-22 00:00:00.0",
+        "invalidTopTime": null,
+        "createId": "12345",
+        "createUser": "夏凌",
+        "createTime": "2025-01-15 17:26:41.0",
+        "publishTime": "2025-01-16 15:11:50.0",
+        },
+        {
+            // ...
+        },
+        {
+            // ...
+        }
+    ]
+}
+```
+
+### '/api/findMyCommonMsgPublishById'
+
+`POST`
+
+> 传入：
+
+```json
+{
+    "id": 2204
+}
+```
+
+> 返回
+
+```json
+{
+    "code": 200,
+    "msg": "成功",
+    "data": {
+        "title": "关于2024-2025学年第二学期本科生、研究生及继续教育（本科）教材选用情况的公示",
+        "content": "<p>test</p>",
+        "attachments": [
+            {
+                "fileName": "xxx",
+                "fileType": "文档 | 表格 | 演示文稿 | 压缩包 | 其他"
+            },
+            {
+                // ,,,
+            },
+        ]
+        }
+}
+```
+
+### '/api/downloadAttachmentByFileName'
+
+`POST`
+
+> 传入：
+
+```json
+{
+    "fileLocation": "URI编码(base64编码(AES加密(文件名)))"
+}
+```
+
+> 返回：
+
+`二进制文件`

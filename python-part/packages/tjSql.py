@@ -287,3 +287,16 @@ def sqlFindMyCommonMsgPublishById(notification_id):
 def sqlUserExist(userName):
     pass
 
+
+# 用户注册
+def sqlInsertUser(userName, password):
+    pass
+
+# 查询通知列表
+# 思路是：先查询置顶消息，再查询普通消息
+def sqlFindMyCommonMsgPublish(_pageNum, _pageSize):
+    pass
+
+# 查询通知详情
+def sqlFindMyCommonMsgPublishById(id):
+    pass
