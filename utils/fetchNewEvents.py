@@ -162,8 +162,8 @@ def findMyCommonMsgPublish(session):
     if (response.status_code == 200):
         print("请求成功！")
         # 调试，输出到文件中
-        with open("response.json", "w") as f:
-            f.write(response.text)
+        # with open("response.json", "w") as f:
+        #     f.write(response.text)
 
         return response.json()['data']['list'] # 返回活动列表
     else:
@@ -191,7 +191,7 @@ def handleDownloadfile(session, attachment):
     download_url = f"https://1.tongji.edu.cn/api/commonservice/obsfile/downloadfile?objectkey="
 
     # 对文件名进行加密
-    remotefilePath = myEncrypt.encryptFilePath(attachment['fileLacation']) # 要和返回的 key 对应，不要乱起名
+    remotefilePath = myEncrypt.encryptFilePath(attachment['fileLacation']) # 要和返回的 key 对应，不要乱起名。我也很惊讶，但就是 Lacation...
 
     download_url += remotefilePath
 

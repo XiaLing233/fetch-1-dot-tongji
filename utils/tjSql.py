@@ -131,11 +131,7 @@ def SQlInsertRelation(notification_id, attachment_id):
 
 # 查询数据库中是否已经记录过这个通知
 def sqlHaveRecorded(notification_id):
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-    except mysql.connector.Error as e:
-        print("数据库连接错误：", e)
-        return False
+    conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
     # 查询通知
@@ -157,3 +153,133 @@ def sqlHaveRecorded(notification_id):
         print(f"通知 {notification_id} 已记录")
         return True
     
+# 查询所有发布的通知，不返回内容
+def sqlFindMyCommonMsgPublish():
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 查询通知，除了内容之外的所有列
+    sql = (
+        f"SELECT {N_ID}, {N_TITLE}, {N_START_TIME}, {N_END_TIME}, "
+        f"{N_INVALID_TOP_TIME}, {N_CREATE_ID}, {N_CREATE_USER}, "
+        f"{N_CREATE_TIME}, {N_PUBLISH_TIME} FROM {N_TABLE_NAME}"
+    )
+    
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql)
+    
+    result = cursor.fetchall()
+
+    print("查询到的通知数量是：", len(result))
+    # print("查询到的通知是：", result)
+    
+    cursor.close()
+    conn.close()
+
+    return result
+
+# 查询一个通知关联的所有附件 ID
+def sqlFindAttachmentByNotificationId(notification_id):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 查询关系表，找到关联的附件
+    sql = (
+        f"SELECT { R_ATTACHMENT_ID } FROM {R_TABLE_NAME} "
+        f"WHERE {R_NOTIFICATION_ID} = %s"
+    )
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (notification_id,))
+
+    result = cursor.fetchall()
+
+    print("查询到的附件数量是：", len(result))
+
+    print("查询到的附件是：", result)
+
+    cursor.close()
+    conn.close()
+
+    return result
+
+# 根据附件的 Id 查询附件的信息，返回全部信息，根据需要再取舍
+def sqlFindAttachmentById(attachment_id):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 查询附件表，找到附件的信息
+    sql = (
+        f"SELECT * FROM {A_TABLE_NAME} WHERE {A_ID} = %s"
+    )
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (attachment_id,))
+
+    result = cursor.fetchall()
+
+    # print("查询到的附件是：", result)
+
+    cursor.close()
+    conn.close()
+
+    return result
+
+# 查询所有发布的通知，返回内容和附件
+def sqlFindMyCommonMsgPublishById(notification_id):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 查询通知，返回所有列
+    sql = (
+        f"SELECT * FROM {N_TABLE_NAME} WHERE {N_ID} = %s"
+    )
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (notification_id,))
+
+    result = cursor.fetchall()
+
+    # 查询关联附件的 ID
+    attachments = sqlFindAttachmentByNotificationId(notification_id)
+
+    attachment_list = []
+
+    # 查询附件的信息
+    for attachment in attachments:
+        attachment_info = sqlFindAttachmentById(attachment[0])
+        # 只保留 id 和 fileName
+        attachment_info = {
+            f"{ A_ID }": attachment_info[0][0],
+            f'{ A_FILENAME }': attachment_info[0][1]
+        }
+        print("查询到的附件信息是：", attachment_info)
+        attachment_list.append(attachment_info)
+
+    # 把通知和附件信息合并
+    notification_data = {
+        f"{ N_ID }": result[0][0],
+        f"{ N_TITLE }": result[0][1],
+        f"{ N_CONTENT }": result[0][2],
+        f"{ N_START_TIME }": result[0][3],
+        f"{ N_END_TIME }": result[0][4],
+        f"{ N_INVALID_TOP_TIME }": result[0][5],
+        f"{ N_CREATE_ID }": result[0][6],
+        f"{ N_CREATE_USER }": result[0][7],
+        f"{ N_CREATE_TIME }": result[0][8],
+        f"{ N_PUBLISH_TIME }": result[0][9],
+        'attachments': attachment_list
+    }
+    
+    print("查询到的通知是：", notification_data)
+
+    return notification_data
+
+    
+# sqlFindMyCommonMsgPublish()
+# sqlFindAttachmentByNotificationId(2204)
+# sqlFindMyCommonMsgPublishById(2191)
