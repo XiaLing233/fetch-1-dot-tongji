@@ -95,7 +95,7 @@ Werkzeug | 3.1.3 | |
 
 ## api
 
-### '/api/register'
+### `/api/register`
 
 `POST`
 
@@ -119,7 +119,7 @@ Werkzeug | 3.1.3 | |
 }
 ```
 
-### '/api/login'
+### `/api/login`
 
 `POST`
 
@@ -142,7 +142,7 @@ Werkzeug | 3.1.3 | |
 }
 ```
 
-### '/api/recovery'
+### `/api/recovery`
 
 `POST`
 
@@ -165,7 +165,7 @@ Werkzeug | 3.1.3 | |
 }
 ```
 
-### '/api/sendVerificationEmail'
+### `/api/sendVerificationEmail`
 
 `POST`
 
@@ -186,7 +186,7 @@ Werkzeug | 3.1.3 | |
 }
 ```
 
-### '/api/sendRecoveryEmail'
+### `/api/sendRecoveryEmail`
 
 `POST`
 
@@ -209,7 +209,7 @@ Werkzeug | 3.1.3 | |
 
 ### 以下需要验证 token
 
-### '/api/changePassword'
+### `/api/changePassword`
 
 `POST`
 
@@ -231,18 +231,9 @@ Werkzeug | 3.1.3 | |
 }
 ```
 
-### '/api/findMyCommonMsgPublish'
+### `/api/findMyCommonMsgPublish`
 
-`POST`
-
-> 传入：
-
-```json
-{
-    "_pageNum": 1,
-    "_pageSize": 20
-}
-```
+`GET`
 
 > 返回
 
@@ -272,7 +263,7 @@ Werkzeug | 3.1.3 | |
 }
 ```
 
-### '/api/findMyCommonMsgPublishById'
+### `/api/findMyCommonMsgPublishById`
 
 `POST`
 
@@ -306,7 +297,7 @@ Werkzeug | 3.1.3 | |
 }
 ```
 
-### '/api/downloadAttachmentByFileName'
+### `/api/downloadAttachmentByFileName`
 
 `POST`
 

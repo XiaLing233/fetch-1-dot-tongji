@@ -12,6 +12,7 @@ from argon2 import PasswordHasher
 import random # 生成随机数
 import re # 正则表达式
 import time # 时间
+import pytz # 时区
 import datetime # 时间
 import redis # redis
 
@@ -128,22 +129,8 @@ def checkEmailFormat(email):
 def generateVerificationCode():
     return random.randint(100000, 999999)
 
-# 测试邮件发送
-# @app.route('/api/test/emailsend', methods=['GET'])
-# def testEmailSend():
-#     print("测试邮件发送")
-#     sendEmailVerification('wangxilin@tongji.edu.cn', '123456')
-
-#     return jsonify({
-#         'code': 200,
-#         'msg': '发送成功'
-#     })
-
-
-
 
 # ----- API ----- #
-
 
 
 
@@ -174,6 +161,18 @@ def sendVerificationEmail():
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
         }), 400
+
+    # 检查发送频率限制
+    current_time = time.time()
+    last_send_time = session.get('send_time', 0)
+    last_email = session.get('email', '')
+
+     # 如果是同一个邮箱且未超过5分钟，则拒绝请求
+    if last_email == xl_username and (current_time - last_send_time) < 300:  # 300秒 = 5分钟
+        return jsonify({
+            'code': 429,
+            'msg': '已经发送过验证码，请及时查收，请格外留意垃圾邮件(邮箱地址正确了吗？)'
+        }), 429
 
     # 生成验证码
     token = generateVerificationCode()
@@ -221,12 +220,24 @@ def sendRecoveryEmail():
         }), 400
 
     # 检查用户是否存在
-    if sqlUserExist(xl_username) == False:
+    if tjSql.sqlUserExist(xl_username) == False:
         return jsonify({
             'code': 400,
             'msg': '用户不存在，请移步注册页面'
         }), 400
 
+    # 检查发送频率限制
+    current_time = time.time()
+    last_send_time = session.get('send_time', 0)
+    last_email = session.get('email', '')
+
+     # 如果是同一个邮箱且未超过5分钟，则拒绝请求
+    if last_email == xl_username and (current_time - last_send_time) < 300:  # 300秒 = 5分钟
+        return jsonify({
+            'code': 429,
+            'msg': '已经发送过验证码，请及时查收，请格外留意垃圾邮件(邮箱地址正确了吗？)'
+        }), 429
+    
     # 生成验证码
     token = generateVerificationCode()
 
@@ -278,7 +289,7 @@ def register():
         })
 
     # 检查用户名是否存在
-    if sqlUserExist(xl_username) == True:
+    if tjSql.sqlUserExist(xl_username) == True:
         return jsonify({
             'code': 400,
             'msg': '用户已存在'
@@ -304,7 +315,11 @@ def register():
     hashed_password = PasswordHasher().hash(xl_password)
 
     # 把用户信息写入数据库
-    sqlInsertUser(xl_username, hashed_password)
+    # 顺序：@前的部分作为用户名; 邮箱; 密码; 当前时间
+    username = xl_username.split('@')[0]
+    tz = pytz.timezone('Asia/Shanghai')
+    current_time = datetime.datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+    tjSql.sqlInsertUser(username, xl_username, hashed_password, current_time)
 
     # 返回 token
     access_token = create_access_token(identity=xl_username)
@@ -339,7 +354,7 @@ def login():
     xl_password = request.json.get('xl_password')
 
     # 先判断用户名是否存在
-    if sqlUserExist(xl_username) == False:
+    if tjSql.sqlUserExist(xl_username) == False:
         return jsonify({
             'code': 400,
             'msg': '用户不存在'
@@ -349,7 +364,7 @@ def login():
     xl_password = myDecrypt.decryptPassword(xl_password)
 
     # 获取数据库中的密码
-    hashed_password = sqlGetPassword(xl_username)
+    hashed_password = tjSql.sqlGetPassword(xl_username)
 
     # 验证密码
     if PasswordHasher().verify(hashed_password, xl_password) == False:
@@ -400,7 +415,7 @@ def recovery():
         })
 
     # 检查用户名是否存在
-    if sqlUserExist(xl_username) == False:
+    if tjSql.sqlUserExist(xl_username) == False:
         return jsonify({
             'code': 400,
             'msg': '用户不存在'
@@ -426,7 +441,7 @@ def recovery():
     hashed_password = PasswordHasher().hash(xl_password)
 
     # 更新密码
-    sqlUpdatePassword(xl_username, hashed_password)
+    tjSql.sqlUpdatePassword(xl_username, hashed_password)
 
     # 返回 token
     access_token = create_access_token(identity=xl_username)
@@ -471,7 +486,7 @@ def changePassword():
     hashed_password = PasswordHasher().hash(xl_newpassword)
 
     # 更新密码
-    sqlUpdatePassword(xl_username, hashed_password)
+    tjSql.sqlUpdatePassword(xl_username, hashed_password)
 
     return jsonify({
         'code': 200,
@@ -480,13 +495,6 @@ def changePassword():
 
 # 获取通知列表
 '''
-> 传入：
-
-{
-    "_pageNum": 1,
-    "_pageSize": 20
-}
-
 > 返回
 
 {
@@ -516,12 +524,8 @@ def changePassword():
 @app.route('/api/findMyCommonMsgPublish', methods=['POST'])
 @jwt_required()
 def findMyCommonMsgPublish():
-    # 获取参数
-    _pageNum = request.json.get('_pageNum')
-    _pageSize = request.json.get('_pageSize')
-
     # 查询通知
-    data = sqlFindMyCommonMsgPublish(_pageNum, _pageSize)
+    data = tjSql.sqlFindMyCommonMsgPublish()
 
     return jsonify({
         'code': 200,
@@ -565,7 +569,7 @@ def findMyCommonMsgPublishById():
     id = request.json.get('id')
 
     # 查询通知
-    data = sqlFindMyCommonMsgPublishById(id)
+    data = tjSql.sqlFindMyCommonMsgPublishById(id)
 
     return jsonify({
         'code': 200,

@@ -1,6 +1,7 @@
 # 存放了数据库部分
 import mysql.connector # 数据库连接
 import configparser # 读取配置文件
+import datetime # 时间处理
 
 # 读取配置文件
 CONFIG = configparser.ConfigParser()
@@ -54,6 +55,24 @@ R_TABLE_NAME = CONFIG['Table']['r_table_name']
 # R_ID = CONFIG['Table']['r_id'] # 关系表格的主键是自增的，不需要传入
 R_NOTIFICATION_ID = CONFIG['Table']['r_notification_id']
 R_ATTACHMENT_ID = CONFIG['Table']['r_attachment_id']
+
+# 读取用户表格结构
+
+U_TABLE_NAME = CONFIG['Table']['u_table_name']
+# U_ID = CONFIG['Table']['u_id']
+U_USERNAME = CONFIG['Table']['u_username']
+U_EMAIL = CONFIG['Table']['u_email']
+U_PASSWORD = CONFIG['Table']['u_password']
+U_CREATED_AT = CONFIG['Table']['u_created_at']
+
+# 读取登录日志表格结构
+
+L_TABLE_NAME = CONFIG['Table']['l_table_name']
+# L_ID = CONFIG['Table']['l_id']
+L_USER_ID = CONFIG['Table']['l_user_id']
+L_IP_ADDRESS = CONFIG['Table']['l_ip_address']
+L_LOGIN_AT = CONFIG['Table']['l_login_at']
+
 
 # ----- 数据插入部分 ----- #
 
@@ -153,8 +172,9 @@ def sqlHaveRecorded(notification_id):
         print(f"通知 {notification_id} 已记录")
         return True
     
-# 查询所有发布的通知，不返回内容
-def sqlFindMyCommonMsgPublish():
+# 查询所有置顶的通知，不返回内容
+# 置顶与否的判据是当前时间是否超过了 invalidTopTime
+def sqlFindMyCommonMsgTop():
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
@@ -162,14 +182,49 @@ def sqlFindMyCommonMsgPublish():
     sql = (
         f"SELECT {N_ID}, {N_TITLE}, {N_START_TIME}, {N_END_TIME}, "
         f"{N_INVALID_TOP_TIME}, {N_CREATE_ID}, {N_CREATE_USER}, "
-        f"{N_CREATE_TIME}, {N_PUBLISH_TIME} FROM {N_TABLE_NAME}"
+        f"{N_CREATE_TIME}, {N_PUBLISH_TIME} FROM {N_TABLE_NAME} "
+        f"WHERE {N_INVALID_TOP_TIME} > %s"
+        f"ORDER BY {N_PUBLISH_TIME} DESC"
+    )
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
+    
+    result = cursor.fetchall()
+
+    print("查询到的通知数量是：", len(result))
+    # print("查询到的通知是：", result)
+    
+    cursor.close()
+    conn.close()
+
+    return result
+
+
+# 查询所有发布的通知，不返回内容
+# 先查询置顶的，再查询未置顶的
+def sqlFindMyCommonMsgPublish():
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 先查询置顶的
+    result = sqlFindMyCommonMsgTop()
+
+    # 再查询未置顶的
+    sql = (
+        f"SELECT {N_ID}, {N_TITLE}, {N_START_TIME}, {N_END_TIME}, "
+        f"{N_INVALID_TOP_TIME}, {N_CREATE_ID}, {N_CREATE_USER}, "
+        f"{N_CREATE_TIME}, {N_PUBLISH_TIME} FROM {N_TABLE_NAME} "
+        f"WHERE {N_INVALID_TOP_TIME} <= %s "
+        f"ORDER BY {N_PUBLISH_TIME} DESC" # 按照发布时间倒序排列，最新的在前
     )
     
     print("执行的 SQL 语句是：", sql)
 
-    cursor.execute(sql)
+    cursor.execute(sql, (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
     
-    result = cursor.fetchall()
+    result += cursor.fetchall()
 
     print("查询到的通知数量是：", len(result))
     # print("查询到的通知是：", result)
@@ -228,7 +283,7 @@ def sqlFindAttachmentById(attachment_id):
 
     return result
 
-# 查询所有发布的通知，返回内容和附件
+# 根据 id 查询发布的通知，返回内容和附件
 def sqlFindMyCommonMsgPublishById(notification_id):
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
@@ -285,18 +340,102 @@ def sqlFindMyCommonMsgPublishById(notification_id):
 
 # 查询用户是否存在
 def sqlUserExist(userName):
-    pass
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
 
+    # 查询用户
+    sql = f"SELECT * FROM {U_TABLE_NAME} WHERE {U_USERNAME} = %s"
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (userName,))
+
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    if len(result) == 0:
+        print(f"用户 {userName} 不存在")
+        return False
+    else:
+        print(f"用户 {userName} 已存在")
+        return True
+    
 
 # 用户注册
-def sqlInsertUser(userName, password):
-    pass
+# 顺序是：用户名，邮箱，密码，注册时间
+def sqlInsertUser(userName, email, password, created_at):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
 
-# 查询通知列表
-# 思路是：先查询置顶消息，再查询普通消息
-def sqlFindMyCommonMsgPublish(_pageNum, _pageSize):
-    pass
+    # 插入用户
+    sql = (
+        f"INSERT INTO {U_TABLE_NAME} "
+        f"({U_USERNAME}, {U_EMAIL}, {U_PASSWORD}, {U_CREATED_AT}) "
+        f"VALUES (%s, %s, %s, %s)"
+    )
 
-# 查询通知详情
-def sqlFindMyCommonMsgPublishById(id):
-    pass
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (userName, email, password, created_at))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if cursor.rowcount == 1:
+        print("插入成功")
+        return True
+    else:
+        print("插入失败")
+        return False
+
+
+# 返回数据库中的密码，加密的，原样返回
+def sqlGetPassword(email):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 查询用户的密码
+    sql = f"SELECT {U_PASSWORD} FROM {U_TABLE_NAME} WHERE {U_EMAIL} = %s"
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (email,))
+
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    if len(result) == 0:
+        print("用户不存在")
+        return None
+    
+
+
+    return result[0][0]
+
+# 更新密码
+def sqlUpdatePassword(email, newPassword):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 更新用户的密码
+    sql = f"UPDATE {U_TABLE_NAME} SET {U_PASSWORD} = %s WHERE {U_EMAIL} = %s"
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (newPassword, email))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if cursor.rowcount == 1:
+        print("更新成功")
+        return True
+    else:
+        print("更新失败")
+        return False
