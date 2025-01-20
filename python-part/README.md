@@ -45,6 +45,19 @@ r_table_name =
 r_notification_id = 
 r_attachment_id = 
 
+# User table
+u_table_name = 
+u_nickname = 
+u_email = 
+u_password = 
+u_created_at = 
+
+# Login log table
+l_table_name = 
+l_user_id = 
+l_ip_address = 
+l_login_at = 
+
 [Storage]
 path = ./data # 附件文件存储的位置
 
@@ -55,6 +68,22 @@ path = ./data # 附件文件存储的位置
 http = socks5h://...
 https = socks5h://...
 
+[RSA]
+private_key_path = 
+public_key_path = 
+
+[AES]
+key = 
+iv = 
+
+[JWT]
+secret_key = 
+
+[Email]
+smtp_server = 
+smtp_port = 
+smtp_username = 
+smtp_password = 
 ```
 
 在本文件夹下新建一个 `config.ini`，把学号和密码替换为自己的，即可实现登录功能。
@@ -65,30 +94,35 @@ pip 版本是 23.1.2，升级之后可能有问题，导入包会失效..玄学
 
 Package     |           Version | 手动 pip 安装? |
 -------------|------------------- | -------- |
-argon2-cffi | 23.1.0 | √ |
+argon2-cffi | 23.1.0 | ✅ |
 argon2-cffi-bindings | 21.2.0 | |
 blinker | 1.9.0 | |
+cachelib | 0.13.0 | |
 certifi | 2024.12.14 | |
 cffi | 1.17.1 | |
 charset-normalizer | 3.4.1 | |
 click | 8.1.8 | |
 colorama | 0.4.6 | |
-configparser | 7.1.0 | √ |
-Flask | 3.1.0 | √ |
-Flask-Cors | 5.0.0 | √ |
-Flask-JWT-Extended | 4.7.1 | √ |
-Flask-Mail | 0.10.0 | √ |
+configparser | 7.1.0 | ✅ |
+Flask | 3.1.0 | ✅ |
+Flask-Cors | 5.0.0 | ✅ |
+Flask-JWT-Extended | 4.7.1 | ✅ |
+Flask-Mail | 0.10.0 | ✅ |
+Flask-Session | 0.8.0 | ✅ |
 idna | 3.10 | |
 itsdangerous | 2.2.0 | |
 Jinja2 | 3.1.5 | |
 MarkupSafe | 3.0.2 | |
-mysql-connector-python | 9.1.0 | √ |
+msgspec | 0.19.0 | |
+mysql-connector-python | 9.1.0 | ✅ |
 pip | 23.1.2 | |
 pycparser | 2.22 | |
-pycryptodome | 3.21.0 | √ |
+pycryptodome | 3.21.0 | ✅ |
 PyJWT | 2.10.1 | |
-PySocks | 1.7.1 | √ |
-requests | 2.32.3 | √ |
+PySocks | 1.7.1 | ✅ |
+pytz | 2024.2 | ✅ |
+redis | 5.2.1 | ✅ |
+requests | 2.32.3 | ✅ |
 setuptools | 65.5.0 | |
 urllib3 | 2.3.0 | |
 Werkzeug | 3.1.3 | |

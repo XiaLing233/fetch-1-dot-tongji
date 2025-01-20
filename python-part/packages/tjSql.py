@@ -60,7 +60,7 @@ R_ATTACHMENT_ID = CONFIG['Table']['r_attachment_id']
 
 U_TABLE_NAME = CONFIG['Table']['u_table_name']
 # U_ID = CONFIG['Table']['u_id']
-U_USERNAME = CONFIG['Table']['u_username']
+U_NICKNAME = CONFIG['Table']['u_nickname']
 U_EMAIL = CONFIG['Table']['u_email']
 U_PASSWORD = CONFIG['Table']['u_password']
 U_CREATED_AT = CONFIG['Table']['u_created_at']
@@ -344,7 +344,7 @@ def sqlUserExist(userName):
     cursor = conn.cursor()
 
     # 查询用户
-    sql = f"SELECT * FROM {U_TABLE_NAME} WHERE {U_USERNAME} = %s"
+    sql = f"SELECT * FROM {U_TABLE_NAME} WHERE {U_NICKNAME} = %s"
 
     print("执行的 SQL 语句是：", sql)
 
@@ -372,7 +372,7 @@ def sqlInsertUser(userName, email, password, created_at):
     # 插入用户
     sql = (
         f"INSERT INTO {U_TABLE_NAME} "
-        f"({U_USERNAME}, {U_EMAIL}, {U_PASSWORD}, {U_CREATED_AT}) "
+        f"({U_NICKNAME}, {U_EMAIL}, {U_PASSWORD}, {U_CREATED_AT}) "
         f"VALUES (%s, %s, %s, %s)"
     )
 

@@ -139,7 +139,7 @@ def generateVerificationCode():
 > 传入：
 
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "admin@tongji.edu.cn",
 }
 
 
@@ -153,10 +153,10 @@ def generateVerificationCode():
 @app.route('/api/sendVerificationEmail', methods=['POST'])
 def sendVerificationEmail():
     # 获取参数
-    xl_username = request.json.get('xl_username')
+    xl_email = request.json.get('xl_email')
 
     # 检查邮箱格式
-    if checkEmailFormat(xl_username) == False:
+    if checkEmailFormat(xl_email) == False:
         return jsonify({
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
@@ -168,7 +168,7 @@ def sendVerificationEmail():
     last_email = session.get('email', '')
 
      # 如果是同一个邮箱且未超过5分钟，则拒绝请求
-    if last_email == xl_username and (current_time - last_send_time) < 300:  # 300秒 = 5分钟
+    if last_email == xl_email and (current_time - last_send_time) < 300:  # 300秒 = 5分钟
         return jsonify({
             'code': 429,
             'msg': '已经发送过验证码，请及时查收，请格外留意垃圾邮件(邮箱地址正确了吗？)'
@@ -179,11 +179,11 @@ def sendVerificationEmail():
 
     # redis 中保存验证码
     session['verification_code'] = token
-    session['email'] = xl_username
+    session['email'] = xl_email
     session['send_time'] = time.time()
 
     # 发送邮件
-    sendEmailVerification(xl_username, token)
+    sendEmailVerification(xl_email, token)
 
     return jsonify({
         'code': 200,
@@ -196,7 +196,7 @@ def sendVerificationEmail():
 > 传入：
 
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "admin@tongji.edu.cn",
 }
 
 
@@ -210,17 +210,17 @@ def sendVerificationEmail():
 @app.route('/api/sendRecoveryEmail', methods=['POST'])
 def sendRecoveryEmail():
     # 获取参数
-    xl_username = request.json.get('xl_username')
+    xl_email = request.json.get('xl_email')
 
     # 检查邮箱格式
-    if checkEmailFormat(xl_username) == False:
+    if checkEmailFormat(xl_email) == False:
         return jsonify({
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
         }), 400
 
     # 检查用户是否存在
-    if tjSql.sqlUserExist(xl_username) == False:
+    if tjSql.sqlUserExist(xl_email) == False:
         return jsonify({
             'code': 400,
             'msg': '用户不存在，请移步注册页面'
@@ -232,7 +232,7 @@ def sendRecoveryEmail():
     last_email = session.get('email', '')
 
      # 如果是同一个邮箱且未超过5分钟，则拒绝请求
-    if last_email == xl_username and (current_time - last_send_time) < 300:  # 300秒 = 5分钟
+    if last_email == xl_email and (current_time - last_send_time) < 300:  # 300秒 = 5分钟
         return jsonify({
             'code': 429,
             'msg': '已经发送过验证码，请及时查收，请格外留意垃圾邮件(邮箱地址正确了吗？)'
@@ -243,11 +243,11 @@ def sendRecoveryEmail():
 
     # session 中保存验证码
     session['verification_code'] = token
-    session['email'] = xl_username
+    session['email'] = xl_email
     session['send_time'] = time.time() # 发送时间
 
     # 发送邮件
-    sendEmailFindPassword(xl_username, token)
+    sendEmailFindPassword(xl_email, token)
 
     return jsonify({
         'code': 200,
@@ -261,7 +261,7 @@ def sendRecoveryEmail():
 > 传入：
 
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "admin@tongji.edu.cn",
     "xl_password": "RSA加密后的密码",
     "xl_veri_code": "233333"
 }
@@ -277,19 +277,19 @@ def sendRecoveryEmail():
 @app.route('/api/register', methods=['POST'])
 def register():
     # 获取参数
-    xl_username = request.json.get('xl_username')
+    xl_email = request.json.get('xl_email')
     xl_password = request.json.get('xl_password')
     xl_veri_code = request.json.get('xl_veri_code')
 
     # 检查邮箱格式
-    if checkEmailFormat(xl_username) == False:
+    if checkEmailFormat(xl_email) == False:
         return jsonify({
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
         })
 
     # 检查用户名是否存在
-    if tjSql.sqlUserExist(xl_username) == True:
+    if tjSql.sqlUserExist(xl_email) == True:
         return jsonify({
             'code': 400,
             'msg': '用户已存在'
@@ -316,13 +316,13 @@ def register():
 
     # 把用户信息写入数据库
     # 顺序：@前的部分作为用户名; 邮箱; 密码; 当前时间
-    username = xl_username.split('@')[0]
+    nickname = xl_email.split('@')[0]
     tz = pytz.timezone('Asia/Shanghai')
     current_time = datetime.datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
-    tjSql.sqlInsertUser(username, xl_username, hashed_password, current_time)
+    tjSql.sqlInsertUser(nickname, xl_email, hashed_password, current_time)
 
     # 返回 token
-    access_token = create_access_token(identity=xl_username)
+    access_token = create_access_token(identity=xl_email)
 
     return jsonify({
         'code': 200,
@@ -336,7 +336,7 @@ def register():
 '''
 > 请求
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "admin@tongji.edu.cn",
     "xl_password": "RSA加密&URI编码后的密码"
 }
 
@@ -350,11 +350,11 @@ def register():
 @app.route('/api/login', methods=['POST'])
 def login():
     # 获取参数
-    xl_username = request.json.get('xl_username')
+    xl_email = request.json.get('xl_email')
     xl_password = request.json.get('xl_password')
 
     # 先判断用户名是否存在
-    if tjSql.sqlUserExist(xl_username) == False:
+    if tjSql.sqlUserExist(xl_email) == False:
         return jsonify({
             'code': 400,
             'msg': '用户不存在'
@@ -364,7 +364,7 @@ def login():
     xl_password = myDecrypt.decryptPassword(xl_password)
 
     # 获取数据库中的密码
-    hashed_password = tjSql.sqlGetPassword(xl_username)
+    hashed_password = tjSql.sqlGetPassword(xl_email)
 
     # 验证密码
     if PasswordHasher().verify(hashed_password, xl_password) == False:
@@ -374,7 +374,7 @@ def login():
         })
 
     # 返回 token
-    access_token = create_access_token(identity=xl_username)
+    access_token = create_access_token(identity=xl_email)
 
     return jsonify({
         'code': 200,
@@ -387,7 +387,7 @@ def login():
 > 传入：
 
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "admin@tongji.edu.cn",
     "xl_password": "RSA加密后的密码"
 }
 
@@ -403,19 +403,19 @@ def login():
 @app.route('/api/recovery', methods=['POST'])
 def recovery():
     # 获取参数
-    xl_username = request.json.get('xl_username')
+    xl_email = request.json.get('xl_email')
     xl_password = request.json.get('xl_password')
     xl_veri_code = request.json.get('xl_veri_code')
 
     # 检查邮箱格式
-    if checkEmailFormat(xl_username) == False:
+    if checkEmailFormat(xl_email) == False:
         return jsonify({
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
         })
 
     # 检查用户名是否存在
-    if tjSql.sqlUserExist(xl_username) == False:
+    if tjSql.sqlUserExist(xl_email) == False:
         return jsonify({
             'code': 400,
             'msg': '用户不存在'
@@ -441,10 +441,10 @@ def recovery():
     hashed_password = PasswordHasher().hash(xl_password)
 
     # 更新密码
-    tjSql.sqlUpdatePassword(xl_username, hashed_password)
+    tjSql.sqlUpdatePassword(xl_email, hashed_password)
 
     # 返回 token
-    access_token = create_access_token(identity=xl_username)
+    access_token = create_access_token(identity=xl_email)
 
     return jsonify({
         'code': 200,
@@ -461,7 +461,7 @@ def recovery():
 > 传入：
 
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "admin@tongji.edu.cn",
     "xl_newpassword": "加密后的新密码"
 }
 
@@ -477,7 +477,7 @@ json
 @jwt_required()
 def changePassword():
     # 获取参数
-    xl_username = request.json.get('xl_username')
+    xl_email = request.json.get('xl_email')
     xl_newpassword = request.json.get('xl_newpassword')
 
     # 解密密码
@@ -486,7 +486,7 @@ def changePassword():
     hashed_password = PasswordHasher().hash(xl_newpassword)
 
     # 更新密码
-    tjSql.sqlUpdatePassword(xl_username, hashed_password)
+    tjSql.sqlUpdatePassword(xl_email, hashed_password)
 
     return jsonify({
         'code': 200,
