@@ -18,8 +18,8 @@ STU_NO = CONFIG['Account']['sno']
 STU_PWD = CONFIG['Account']['passwd']
 
 # js 链接
-RSA_URL = CONFIG['Js']['rsa_url']
-AES_URL = CONFIG['Js']['aes_url']
+# RSA_URL = CONFIG['Js']['rsa_url'] # 动态获取
+# AES_URL = CONFIG['Js']['aes_url'] # 动态获取
 
 # 代理
 HTTP_PROXY = CONFIG['Proxy']['http']
@@ -34,8 +34,8 @@ PROXIES = {
 # ----- 登录部分 ----- #
 
 # 读取 RSA 公钥
-def getRSAPublicKey():
-    js_url = RSA_URL
+def getRSAPublicKey(js_url):
+    # js_url = RSA_URL
 
     response = requests.get(js_url, proxies=PROXIES, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
 
@@ -58,8 +58,8 @@ def getspAuthChainCode(response_text):
     
 # 把密码用 RSA 加密，公钥是 auth_key
 # 原始密码(str) -> 字节串(bytes) -> RSA加密(bytes) -> base64编码(bytes) -> 最终字符串(str)
-def encryptPassword():
-    auth_key = getRSAPublicKey()
+def encryptPassword(js_url):
+    auth_key = getRSAPublicKey(js_url)
 
     public_key = RSA.import_key(auth_key)
 
@@ -74,8 +74,9 @@ def encryptPassword():
 # ----- 通知内容请求部分 ----- #
 
 # 读取 AES 密钥 和 IV
-def getAESKeyAndIV():
-    js_url = AES_URL
+# js 文件会变，从 ssologin 中获取
+def getAESKeyAndIV(js_url):
+    # js_url = AES_URL
     
     response = requests.get(js_url, proxies=PROXIES, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
 
@@ -91,8 +92,8 @@ def getAESKeyAndIV():
     return iv, key # 返回的是 ASCII 编码的 str
 
 # 对数据进行 AES 加密
-def encryptFilePath(filePath):
-    iv, key = getAESKeyAndIV() # 现在得到的是 ASCII 编码的 str
+def encryptFilePath(js_url, filePath):
+    iv, key = getAESKeyAndIV(js_url) # 现在得到的是 ASCII 编码的 str
 
     # print(filePath)
     # 把 filePath 进行 URI 编码，使用 quote_plus 以确保 / 被编码为 %2F

@@ -88,6 +88,25 @@ function encryptByRSA(message) {
 | notification_id | INT | 存放通知 | |
 | attachment_id | INT | 存放附件 | |
 
+> 用户表(users)
+
+| 关键字 | 类型 | 描述 | 补充说明 |
+| --- | --- | --- | --- |
+| id | INT | 主键 |  |
+| username | VARCHAR(100) | 昵称 | |
+| email | VARCHAR(100) | 注册邮箱  | |
+| password | VARCHAR(100) | 加密的密码 | |
+| created_at | DATETIME | 注册时间 | |
+
+> 登录记录表(login_logs)
+
+| 关键字 | 类型 | 描述 | 补充说明 |
+| --- | --- | --- | --- |
+| id | INT | 主键 |  |
+| user_id | VARCHAR(100) | 用户 id | 外键 |
+| ip_address | VARCHAR(100) | 登录 IP  | |
+| login_at | DATETIME | 登录时间 | |
+
 ### 内容的爬取与存储
 
 #### 爬取

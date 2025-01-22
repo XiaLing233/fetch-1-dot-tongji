@@ -7,6 +7,7 @@ import time # 生成时间戳
 import configparser # 读取配置文件
 from urllib.parse import urlencode # 用于编码请求体
 from packages.tjSql import sqlInsertNotification, sqlHaveRecorded, SqlInsertAttachment, SQlInsertRelation  # 用于写入数据库
+import json
 
 # 读取配置文件
 CONFIG = configparser.ConfigParser()
@@ -25,7 +26,10 @@ PROXIES = {
 # 存储文件的路径
 STORE_PATH = CONFIG['Storage']['path'] # 末尾没有斜杠
 
+# 学号
+STU_NO = CONFIG['Account']['sno']
 # 调试
+
 def debug_response(step, response):
     print("第", step, "步：\n")
     print("状态码：", response.status_code, "\n")
@@ -60,11 +64,18 @@ def login():
 
     # ----- 第二步：ActionAuthChain ----- #
 
+    global RSA_URL
+    # 获取 RSA 公钥所在 js 文件的链接
+    for line in response.text.split('\n'):
+        if 'crypt.js' in line:
+            RSA_URL = "https://iam.tongji.edu.cn/idp/" + line.split('src=\"')[1].split('\"')[0]
+            print(RSA_URL)
+
     chain_url = response.url
 
     login_data = urlencode({
         "j_username": myEncrypt.STU_NO,
-        "j_password": myEncrypt.encryptPassword(),
+        "j_password": myEncrypt.encryptPassword(RSA_URL),
         "j_checkcode": "请输入验证码",
         "op": "login",
         "spAuthChainCode": myEncrypt.getspAuthChainCode(response.text), # 似乎是个固定值，写死在页面的 
@@ -124,6 +135,16 @@ def login():
     https_url = response.headers['Location']
 
     response = session.get(https_url, allow_redirects=False, proxies=PROXIES)
+
+    global AES_URL
+
+    # 提取 AES 公钥的链接
+    for line in response.text.split('>'): # 混淆过的，没有换行符
+        if '/static/js/app.' in line:
+            # print(line)
+            AES_URL = "https://1.tongji.edu.cn" + line.split('src=')[1].split('>')[0] # 提取链接 
+            print(AES_URL)
+
 
     # ----- 第八步：https://1.tongji.edu.cn/api/sessionservice/session/login ----- #
 
@@ -201,7 +222,7 @@ def handleDownloadfile(session, attachment):
     download_url = f"https://1.tongji.edu.cn/api/commonservice/obsfile/downloadfile?objectkey="
 
     # 对文件名进行加密
-    remotefilePath = myEncrypt.encryptFilePath(attachment['fileLacation']) # 要和返回的 key 对应，不要乱起名。我也很惊讶，但就是 Lacation...
+    remotefilePath = myEncrypt.encryptFilePath(AES_URL, attachment['fileLacation']) # 要和返回的 key 对应，不要乱起名。我也很惊讶，但就是 Lacation...
 
     download_url += remotefilePath
 
@@ -245,6 +266,37 @@ def processEvents(session, events):
                     SQlInsertRelation(event['id'], attachment['id'])
                     print("插入关系成功！")
                     time.sleep(5) # 不要频繁请求
+
+    # 退出登录
+    logout_data = {
+        "sessionid": session.cookies.get_dict()['sessionid'],
+        "uid": STU_NO,
+    }
+
+    logout_data = json.dumps(logout_data, separators=(",", ":"))
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
+        'Accept': 'application/json, text/plain, */*',
+        'Origin': 'https://1.tongji.edu.cn/',        
+        'Referer': 'https://1.tongji.edu.cn/workbench',        
+        "Content-Type": "application/json",
+        "Content-Length": str(len(logout_data),),
+    }
+
+    session.headers.update(headers)
+
+    print(headers)
+
+    response = session.post("https://1.tongji.edu.cn/api/sessionservice/session/logout", proxies=PROXIES, data=logout_data)
+
+    if (response.status_code == 200):
+        print("退出登录成功！")
+    else:
+        print("退出登录失败！")
+        print("状态码：", response.status_code)
             
 
 
