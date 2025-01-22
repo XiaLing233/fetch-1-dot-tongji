@@ -15,6 +15,9 @@ import time # 时间
 import pytz # 时区
 import datetime # 时间
 import redis # redis
+import os # 文件操作
+
+import base64 # base64 编码
 
 # 不需要链接数据库，因为由 tjSql 完成
 
@@ -30,7 +33,8 @@ SMTP_PORT = CONFIG['Email']['smtp_port']
 SMTP_USERNAME = CONFIG['Email']['smtp_username']
 SMTP_PASSWORD = CONFIG['Email']['smtp_password']
 
-ROOT_PATH = CONFIG['Storage']['path']
+ATTACHMENT_PATH = CONFIG['Storage']['attachment_path']
+IMG_PATH = CONFIG['Storage']['img_path'] # 背景图片路径
 
 # app 初始化
 
@@ -132,6 +136,39 @@ def generateVerificationCode():
 
 # ----- API ----- #
 
+# 获取背景图片
+'''
+> 返回
+
+{
+    "code": 200,
+    "msg": "成功",
+    "data": "base64编码的图片"
+}
+'''
+@app.route('/api/getBackgroundImg', methods=['GET'])
+def getBackgroundImg():
+    # 获取文件夹中图片的数量
+    img_num = len([name for name in os.listdir(IMG_PATH) if os.path.isfile(os.path.join(IMG_PATH, name))])
+
+    # 根据当前的日期，选择图片
+    current_day = datetime.datetime.now().day
+
+    img_index = current_day % img_num + 1 # 文件命名风格 tongji_%d.jpg
+
+    # 读取图片
+    with open(f'{IMG_PATH}/tongji_{img_index}.jpg', 'rb') as f:
+        img = f.read()
+
+    # base64 编码
+    img = base64.b64encode(img).decode('utf-8')
+
+    print("路径是：", f'{IMG_PATH}/tongji_{img_index}.jpg')
+    return jsonify({
+        'code': 200,
+        'msg': '成功',
+        'data': img
+    })
 
 
 # 验证码验证接口
@@ -376,11 +413,15 @@ def login():
     # 返回 token
     access_token = create_access_token(identity=xl_email)
 
-    return jsonify({
+    response = jsonify({
         'code': 200,
         'msg': '登录成功',
-        'xl_token': access_token
     })
+
+    # 设置 cookie，不在返回体中设置
+    response.set_cookie('xl_token', access_token, httponly=True, samesite='Strict', secure=True)
+
+    return response
 
 # 找回密码
 '''
@@ -600,7 +641,7 @@ def downloadAttachmentByFileName():
     filePath = myDecrypt.decryptFilePath(fileLocation)
 
     # 读取文件
-    with open(f'{ROOT_PATH}/{filePath}', 'rb') as f:
+    with open(f'{ATTACHMENT_PATH}/{filePath}', 'rb') as f:
         content = f.read()
 
     return content

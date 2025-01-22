@@ -7,9 +7,9 @@
 sno = 1234567   # 学号
 passwd = 1234567 # 明文密码
 
-[Js]
-rsa_url = https://iam.tongji.edu.cn/xxx # rsa 公钥所在位置
-aes_url = https://1.tongji.edu.cn/xxx # aes iv 和公钥所在位置
+; [Js]
+; rsa_url = https://iam.tongji.edu.cn/xxx # rsa 公钥所在位置
+; aes_url = https://1.tongji.edu.cn/xxx # aes iv 和公钥所在位置
 
 [Sql]
 host = 
@@ -128,6 +128,22 @@ urllib3 | 2.3.0 | |
 Werkzeug | 3.1.3 | |
 
 ## api
+
+### `/api/getBackgroundImg`
+
+`GET`
+
+> 传入
+
+```json
+> 返回
+
+{
+    "code": 200,
+    "msg": "成功",
+    "data": "base64编码的图片"
+}
+```
 
 ### `/api/register`
 

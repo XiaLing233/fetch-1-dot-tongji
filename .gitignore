@@ -4,6 +4,5 @@ __pycache__
 node_modules
 
 keys/
-
-# 前端没写好呢，先不上传
-1-frontend/
+# encrypt logic
+1-frontend/src/utils/xl_encrypt.js
