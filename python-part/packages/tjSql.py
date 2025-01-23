@@ -196,11 +196,15 @@ def sqlFindMyCommonMsgTop():
 
     print("查询到的通知数量是：", len(result))
     # print("查询到的通知是：", result)
-    
+
+    # 转换为字典
+    result = [dict(zip(cursor.column_names, row)) for row in result]
+
     cursor.close()
     conn.close()
 
     return result
+
 
 
 # 查询所有发布的通知，不返回内容
@@ -225,8 +229,17 @@ def sqlFindMyCommonMsgPublish():
 
     cursor.execute(sql, (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
     
-    result += cursor.fetchall()
+    # 合并查询结果，字典
+    result += [dict(zip(cursor.column_names, row)) for row in cursor.fetchall()]
 
+    # 把时间列转换为中文格式
+    for item in result:
+        item[N_START_TIME] = item[N_START_TIME].strftime("%Y-%m-%d %H:%M:%S")
+        item[N_END_TIME] = item[N_END_TIME].strftime("%Y-%m-%d %H:%M:%S")
+        item[N_CREATE_TIME] = item[N_CREATE_TIME].strftime("%Y-%m-%d %H:%M:%S")
+        item[N_PUBLISH_TIME] = item[N_PUBLISH_TIME].strftime("%Y-%m-%d %H:%M:%S")
+        item[N_INVALID_TOP_TIME] = item[N_INVALID_TOP_TIME].strftime("%Y-%m-%d %H:%M:%S")
+    
     print("查询到的通知数量是：", len(result))
     # print("查询到的通知是：", result)
     
@@ -310,9 +323,21 @@ def sqlFindMyCommonMsgPublishById(notification_id):
         attachment_info = sqlFindAttachmentById(attachment[0])
         # 只保留 id 和 fileName
         attachment_info = {
-            f"{ A_ID }": attachment_info[0][0],
             f'{ A_FILENAME }': attachment_info[0][1]
         }
+
+        # 判断附件的类型，新建 fileType 字段
+        filename = attachment_info[A_FILENAME]
+        if ".doc" in filename:
+            attachment_info['fileType'] = "文档"
+        elif ".xls" in filename:
+            attachment_info['fileType'] = "表格"
+        elif ".ppt" in filename:
+            attachment_info['fileType'] = "演示文稿"
+        elif ".zip" in filename or ".rar" in filename:
+            attachment_info['fileType'] = "压缩包"
+        else:
+            attachment_info['fileType'] = "其他"
         print("查询到的附件信息是：", attachment_info)
         attachment_list.append(attachment_info)
 
@@ -321,13 +346,13 @@ def sqlFindMyCommonMsgPublishById(notification_id):
         f"{ N_ID }": result[0][0],
         f"{ N_TITLE }": result[0][1],
         f"{ N_CONTENT }": result[0][2],
-        f"{ N_START_TIME }": result[0][3],
-        f"{ N_END_TIME }": result[0][4],
-        f"{ N_INVALID_TOP_TIME }": result[0][5],
+        f"{ N_START_TIME }": result[0][3].strftime("%Y-%m-%d %H:%M:%S"),
+        f"{ N_END_TIME }": result[0][4].strftime("%Y-%m-%d %H:%M:%S"),
+        f"{ N_INVALID_TOP_TIME }": result[0][5].strftime("%Y-%m-%d %H:%M:%S"),
         f"{ N_CREATE_ID }": result[0][6],
         f"{ N_CREATE_USER }": result[0][7],
-        f"{ N_CREATE_TIME }": result[0][8],
-        f"{ N_PUBLISH_TIME }": result[0][9],
+        f"{ N_CREATE_TIME }": result[0][8].strftime("%Y-%m-%d %H:%M:%S"),
+        f"{ N_PUBLISH_TIME }": result[0][9].strftime("%Y-%m-%d %H:%M:%S"),
         'attachments': attachment_list
     }
     

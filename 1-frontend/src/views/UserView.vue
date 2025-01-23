@@ -10,7 +10,7 @@
         <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; background-color: #f0f0f0; height: 800px">
             <el-card
             shadow="never"
-            style="margin-top: 10px; width: 800px; padding: 10px 30px 0 30px"
+            style="margin-top: 20px; width: 800px; padding: 10px 30px 0 30px"
         >
             <el-descriptions title="基本信息">
                 <el-descriptions-item label="昵称">{{ this.$store.state.userInfo.xl_nickname }}</el-descriptions-item>

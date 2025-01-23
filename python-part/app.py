@@ -587,8 +587,8 @@ def changePassword():
     ]
 }
 '''
-@app.route('/api/findMyCommonMsgPublish', methods=['POST'])
-@jwt_required()
+@app.route('/api/findMyCommonMsgPublish', methods=['GET'])
+# @jwt_required()
 def findMyCommonMsgPublish():
     # 查询通知
     data = tjSql.sqlFindMyCommonMsgPublish()

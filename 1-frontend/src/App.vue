@@ -5,14 +5,15 @@ import { RouterView } from 'vue-router';
     <el-container>
       <el-header>
         <div class="edu-header-left">
-          <div class="edu-header-logo"></div>
+          <a href="/"><div class="edu-header-logo"></div></a>
         </div>
-        <div class="edu-header-right"  v-if = "$route.path === '/' || $route.path === '/user'">
-          <div class="edu-item">
+        <div class="edu-header-right">
+          <div  v-if="this.$store.state.isLoggedin" style="display: flex;">
+            <div class="edu-item" v-if="this.$store.state.isLoggedin">
             <!-- 需要使用根路径，不能用相对路径 -->
             <el-avatar src="/src/assets/male.png" size="default"></el-avatar> 
           </div>
-          <div class="edu-item">
+          <div class="edu-item" v-if="this.$store.state.isLoggedin" style="margin-top: 12px">
             <el-dropdown>
               <span class="el-dropdown-link">
                 {{ this.$store.state.userInfo.xl_nickname }}
@@ -28,6 +29,15 @@ import { RouterView } from 'vue-router';
               </template>
             </el-dropdown>
             </div>
+          </div>
+          <div v-else style="display: flex; padding-bottom: 7px">
+            <div class="edu-item">
+              <el-button link type="primary" @click="() => $router.push('/login')">登录</el-button>
+            </div>
+            <div class="edu-item">
+              <el-button link type="primary" @click="() => $router.push('/register')">注册</el-button>
+            </div>
+          </div>
             <div class="edu-item">
               <el-dropdown>
                 <span class="el-dropdown-link">

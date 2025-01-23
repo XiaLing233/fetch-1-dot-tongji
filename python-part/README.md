@@ -138,11 +138,9 @@ Werkzeug | 3.1.3 | |
 
 `GET`
 
-> 传入
-
-```json
 > 返回
 
+```json
 {
     "code": 200,
     "msg": "成功",
