@@ -26,8 +26,8 @@
             style="width: 100%; margin: 0; padding: 0;"
         >
 
-            <el-form-item label="邮箱" prop="xl_username">
-                <el-input v-model="form.xl_username">
+            <el-form-item label="邮箱" prop="xl_email">
+                <el-input v-model="form.xl_email">
                     <template #append>@tongji.edu.cn</template>
                 </el-input>
             </el-form-item>
@@ -75,8 +75,8 @@
                 style="width: 400px; margin: 0 auto;"
             >
 
-                <el-form-item label="邮箱" prop="xl_username">
-                    <el-input v-model="form.xl_username">
+                <el-form-item label="邮箱" prop="xl_email">
+                    <el-input v-model="form.xl_email">
                         <template #append>@tongji.edu.cn</template>
                     </el-input>
                 </el-form-item>
@@ -105,17 +105,19 @@
 <script>
 import axios from 'axios'
 import { passwordEncrypt } from '@/utils/xl_encrypt';
+import { ElMessage } from 'element-plus'; // 顶部提示
 
 export default {
     data() {
         return {
             form: {
-                xl_username: '',
+                xl_email: '',
                 xl_password: ''
             },
             backgroundPic: '', // base64 encoded image
+            openDialog: false,
             rules: {
-            xl_username: [
+            xl_email: [
                 { required: true, message: '请输入邮箱地址', trigger: 'blur' },
                 { pattern: /^[a-zA-Z0-9_.-]+$/, message: '邮箱地址不合法', trigger: 'blur' }
             ],
@@ -136,13 +138,20 @@ export default {
                         method: 'post',
                         url: '/api/login',
                         data: {
-                            xl_username: this.form.xl_username,
+                            xl_email: this.form.xl_email + '@tongji.edu.cn',
                             xl_password: passwordEncrypt(this.form.xl_password)
                         }
                     })
-                    .then(response => { 
-                        this.$store.commit('setBackgroundRequested')
+                    .then(response => {
                         console.log(response)
+                        this.$store.commit('login')
+                        console.log("email: " + this.form.xl_email)
+                        this.getUserInfo()
+                        ElMessage({
+                            message: '登录成功',
+                            type: 'success'
+                        })
+                        this.$router.push('/')
                     })
                     .catch(error => {
                         console.log(error)
@@ -150,7 +159,25 @@ export default {
                 }
             })
         },
-        
+        getUserInfo() {
+            axios({
+                method: 'post',
+                url: '/api/getUserInfo',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                },
+                data: {
+                    xl_email: this.form.xl_email + '@tongji.edu.cn'
+                }
+            })
+            .then(response => {
+                    this.$store.commit('setUserInfo', response.data.data)
+            })
+            .catch(error => {
+                console.log(error)
+            })
+        },
     },
     mounted() {
         // if (!this.$store.state.backgroundRequested) {

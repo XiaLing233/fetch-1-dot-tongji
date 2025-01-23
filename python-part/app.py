@@ -2,7 +2,7 @@
 
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, set_access_cookies
 from flask_mail import Mail, Message
 from flask_session import Session
 from packages import tjSql, myDecrypt
@@ -40,11 +40,15 @@ IMG_PATH = CONFIG['Storage']['img_path'] # 背景图片路径
 
 app = Flask(__name__)
 
-CORS(app) # 允许跨域
+CORS(app, supports_credentials=True) # 支持跨域
 
 # 设置 JWT
 app.config['JWT_SECRET_KEY'] = SECRET_KEY
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(hours=1) # token 过期时间
+app.config['JWT_TOKEN_LOCATION'] = ['cookies'] # token 位置
+app.config['JWT_ACCESS_COOKIE_NAME'] = 'xl_token' # token 名称
+# 开发环境
+app.config['JWT_COOKIE_SECURE'] = False
 jwt = JWTManager(app)
 
 # 设置邮件
@@ -58,10 +62,13 @@ SMTP_NICKNAME = "琪露诺bot"
 
 mail = Mail(app)
 
+SESSION_SECRET_KEY = CONFIG['Session']['secret_key']
+
 # 设置 session
 app.config['SESSION_TYPE'] = 'redis'
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
+app.config['SECRET_KEY'] = SESSION_SECRET_KEY
 app.config['SESSION_REDIS'] = redis.Redis(host='localhost', port=6379, db=0)
 
 Session(app)
@@ -82,20 +89,21 @@ def sendEmailVerification(recEmail, token):
         )
     msg.body = f'''亲爱的用户：
 
-                您好！感谢您注册我们的服务。
-                
-                您的验证码是：{token}
-                
-                请在10分钟内完成验证。出于安全考虑，请不要将验证码泄露给他人。
-                
-                如果这不是您的操作，请忽略此邮件。
-                
-                此致
-                xialing.icu
-                '''
+    您好！感谢您注册我们的服务。
+    
+    您的验证码是：{token}
+    
+    请在10分钟内完成验证。出于安全考虑，请不要将验证码泄露给他人。
+    
+    如果这不是您的操作，请忽略此邮件。
+        
+    此致
+    xialing.icu
+    '''
     
     # 发送邮件
     mail.send(msg)
+    print("邮件发送成功")
 
 # 发送找回密码邮件
 def sendEmailFindPassword(recEmail, token):
@@ -107,20 +115,21 @@ def sendEmailFindPassword(recEmail, token):
         )
     msg.body = f'''亲爱的用户：
 
-                您好！您正在尝试找回密码。
-                
-                您的验证码是：{token}
-                
-                请在10分钟内完成验证。出于安全考虑，请不要将验证码泄露给他人。
-                
-                如果这不是您的操作，请忽略此邮件。
-                
-                此致
-                xialing.icu
-                '''
+    您好！您正在尝试找回密码。
+    
+    您的验证码是：{token}
+    
+    请在10分钟内完成验证。出于安全考虑，请不要将验证码泄露给他人。
+    
+    如果这不是您的操作，请忽略此邮件。
+    
+    此致
+    xialing.icu
+    '''
     
     # 发送邮件
     mail.send(msg)
+    print("邮件发送成功")
 
 # 检查邮箱格式
 def checkEmailFormat(email):
@@ -131,7 +140,7 @@ def checkEmailFormat(email):
 
 # 生成验证码，6位数字
 def generateVerificationCode():
-    return random.randint(100000, 999999)
+    return str(random.randint(100000, 999999))
 
 
 # ----- API ----- #
@@ -168,7 +177,7 @@ def getBackgroundImg():
         'code': 200,
         'msg': '成功',
         'data': img
-    })
+    }), 200
 
 
 # 验证码验证接口
@@ -308,7 +317,6 @@ def sendRecoveryEmail():
 {
     "code": 200,
     "msg": "成功",
-    "xl_token": "12345"
 }
 '''
 @app.route('/api/register', methods=['POST'])
@@ -323,28 +331,30 @@ def register():
         return jsonify({
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
-        })
+        }), 400
 
     # 检查用户名是否存在
     if tjSql.sqlUserExist(xl_email) == True:
         return jsonify({
             'code': 400,
             'msg': '用户已存在'
-        })
+        }), 400
 
     # 检查验证码
+    print("session中的验证码：", session.get('verification_code'))
+    print("传入的验证码：", xl_veri_code)
     if session.get('verification_code') != xl_veri_code:
         return jsonify({
             'code': 400,
             'msg': '验证码错误'
-        })
+        }), 400
 
     # 检查验证码是否过期
     if time.time() - session.get('send_time') > 600:
         return jsonify({
             'code': 400,
             'msg': '验证码过期，请重新发送'
-        })
+        }), 400
 
     # 解密密码
     xl_password = myDecrypt.decryptPassword(xl_password)
@@ -361,11 +371,17 @@ def register():
     # 返回 token
     access_token = create_access_token(identity=xl_email)
 
-    return jsonify({
+    response = jsonify({
         'code': 200,
         'msg': '注册成功',
-        'xl_token': access_token
     })
+
+    set_access_cookies(response, access_token)
+
+    # 设置 cookie，不在返回体中设置
+    # response.set_cookie('xl_token', access_token, httponly=True) #, samesite='Strict') #, secure=True)
+    return response, 200
+
 
 
 
@@ -387,6 +403,7 @@ def register():
 @app.route('/api/login', methods=['POST'])
 def login():
     # 获取参数
+    print(request.json)
     xl_email = request.json.get('xl_email')
     xl_password = request.json.get('xl_password')
 
@@ -395,7 +412,7 @@ def login():
         return jsonify({
             'code': 400,
             'msg': '用户不存在'
-        })
+        }), 400
     
     # 解密密码
     xl_password = myDecrypt.decryptPassword(xl_password)
@@ -403,12 +420,14 @@ def login():
     # 获取数据库中的密码
     hashed_password = tjSql.sqlGetPassword(xl_email)
 
+    print("数据库中的密码：", hashed_password)
+
     # 验证密码
     if PasswordHasher().verify(hashed_password, xl_password) == False:
         return jsonify({
             'code': 400,
             'msg': '密码错误'
-        })
+        }), 400
 
     # 返回 token
     access_token = create_access_token(identity=xl_email)
@@ -418,10 +437,11 @@ def login():
         'msg': '登录成功',
     })
 
+    set_access_cookies(response, access_token)
     # 设置 cookie，不在返回体中设置
-    response.set_cookie('xl_token', access_token, httponly=True, samesite='Strict', secure=True)
+    # response.set_cookie('xl_token', access_token, httponly=True) #, samesite='Strict') # , secure=True)
 
-    return response
+    return response, 200
 
 # 找回密码
 '''
@@ -438,7 +458,6 @@ def login():
 {
     "code": 200,
     "msg": "成功",
-    "xl_token": "12345"
 }
 '''
 @app.route('/api/recovery', methods=['POST'])
@@ -453,28 +472,28 @@ def recovery():
         return jsonify({
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
-        })
+        }), 400
 
     # 检查用户名是否存在
     if tjSql.sqlUserExist(xl_email) == False:
         return jsonify({
             'code': 400,
             'msg': '用户不存在'
-        })
+        }), 400
 
     # 检查验证码
     if session.get('verification_code') != xl_veri_code:
         return jsonify({
             'code': 400,
             'msg': '验证码错误'
-        })
+        }), 400
 
     # 检查验证码是否过期
     if time.time() - session.get('send_time') > 600:
         return jsonify({
             'code': 400,
             'msg': '验证码过期，请重新发送'
-        })
+        }), 400
 
     # 解密密码
     xl_password = myDecrypt.decryptPassword(xl_password)
@@ -487,11 +506,17 @@ def recovery():
     # 返回 token
     access_token = create_access_token(identity=xl_email)
 
-    return jsonify({
+    response = jsonify({
         'code': 200,
         'msg': '密码修改成功',
-        'xl_token': access_token
     })
+
+    set_access_cookies(response, access_token)
+    
+    # 设置 cookie，不在返回体中设置
+    # response.set_cookie('xl_token', access_token, httponly=True) #, samesite='Strict') #, secure=True)
+
+    return response, 200
 
 # @@@@@@@@@@@@@WARNING@@@@@@@@@@@@ #
 # @@@@@@@@以下需要验证 token@@@@@@@ #
@@ -532,7 +557,7 @@ def changePassword():
     return jsonify({
         'code': 200,
         'msg': '密码修改成功'
-    })
+    }), 200
 
 # 获取通知列表
 '''
@@ -572,7 +597,7 @@ def findMyCommonMsgPublish():
         'code': 200,
         'msg': '成功',
         'data': data
-    })
+    }), 200
 
 
 # 获取通知详情
@@ -616,7 +641,7 @@ def findMyCommonMsgPublishById():
         'code': 200,
         'msg': '成功',
         'data': data
-    })
+    }), 200
 
 
 # 文件下载
@@ -645,3 +670,46 @@ def downloadAttachmentByFileName():
         content = f.read()
 
     return content
+
+
+# 获取用户信息
+@app.route('/api/getUserInfo', methods=['POST'])
+@jwt_required()
+def getUserInfo():
+    xl_email = request.json.get('xl_email')
+
+    print("xl_email: ", xl_email)
+
+    # 查询用户信息
+    data = tjSql.sqlGetUserInfo(xl_email)
+
+    print(data)
+
+    # 转换为键值对
+    data = {
+        'xl_nickname': data[0],
+        'xl_email': data[1],
+        'xl_created_at': data[2].strftime('%Y年%m月%d日 %H:%M:%S'),
+        'xl_receive_noti': bool(data[3])
+    }
+
+    return jsonify({
+        'code': 200,
+        'msg': '成功',
+        'data': data
+    }), 200
+
+
+# 更新获取提醒的设置
+@app.route('/api/toggleReceiveNoti', methods=['POST'])
+@jwt_required()
+def toggleReceiveNoti():
+    xl_email = request.json.get('xl_email')
+    expect_option = request.json.get('expect_option')
+
+    tjSql.sqltoggleReceiveNoti(xl_email, expect_option)
+
+    return jsonify({
+        'code': 200,
+        'msg': '成功'
+    }), 200

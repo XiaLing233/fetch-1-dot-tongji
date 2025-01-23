@@ -26,8 +26,8 @@
                 style="width: 100%; margin: 0; padding: 0;"
             >
 
-                <el-form-item label="邮箱" prop="xl_username">
-                    <el-input v-model="form.xl_username">
+                <el-form-item label="邮箱" prop="xl_email">
+                    <el-input v-model="form.xl_email">
                         <template #append>@tongji.edu.cn</template>
                     </el-input>
                 </el-form-item>
@@ -40,7 +40,7 @@
                 <el-form-item label="验证码" prop="xl_veri_code">
                     <el-input v-model="form.xl_veri_code">
                     <template #append>
-                        <el-button type="primary" id="veribtn">发送验证码</el-button>
+                        <el-button type="primary" :id="emailCounter === 0 ? 'veribtn' : ''" @click="sendVerificationEmail" :disabled="emailCounter !== 0">{{ emailCounter === 0 ? '发送验证码' : `已发送(${emailCounter}s)` }}</el-button>
                     </template>
                     </el-input>
                 </el-form-item>
@@ -78,8 +78,8 @@
                 style="width: 400px; margin: 0 auto;"
             >
 
-                <el-form-item label="邮箱" prop="xl_username">
-                    <el-input v-model="form.xl_username">
+                <el-form-item label="邮箱" prop="xl_email">
+                    <el-input v-model="form.xl_email">
                         <template #append>@tongji.edu.cn</template>
                     </el-input>
                 </el-form-item>
@@ -92,7 +92,7 @@
                 <el-form-item label="验证码" prop="xl_veri_code">
                     <el-input v-model="form.xl_veri_code">
                     <template #append>
-                        <el-button type="primary" id="veribtn">发送验证码</el-button>
+                        <el-button type="primary" :id="emailCounter === 0 ? 'veribtn' : ''" @click="sendVerificationEmail" :disabled="emailCounter !== 0">{{ emailCounter === 0 ? '发送验证码' : `已发送(${emailCounter}s)` }}</el-button>
                     </template>
                     </el-input>
                 </el-form-item>
@@ -115,14 +115,16 @@ export default {
     data() {
         return {
             form: {
-                xl_username: '',
+                xl_email: '',
                 xl_password: '',
                 xl_password_confirm: '',
                 xl_veri_code: ''
             },
             backgroundPic: '', // base64 encoded image
+            emailCounter: 0,
+            openDialog: false,
             rules: {
-            xl_username: [
+            xl_email: [
                 { required: true, message: '请输入邮箱地址', trigger: 'blur' },
                 { pattern: /^[a-zA-Z0-9_.-]+$/, message: '邮箱地址不合法', trigger: 'blur' }
             ],
@@ -157,12 +159,66 @@ export default {
                         method: 'post',
                         url: '/api/register',
                         data: {
-                            xl_username: this.form.xl_username,
+                            xl_email: this.form.xl_email + '@tongji.edu.cn',
                             xl_password: passwordEncrypt(this.form.xl_password),
                             xl_veri_code: this.form.xl_veri_code
                         }
                     })
                     .then(response => { 
+                        console.log(response)
+                        this.$store.commit('login')
+                        this.getUserInfo()
+                        ElMessage({
+                            message: '注册成功',
+                            type: 'success'
+                        })
+                        this.$router.push('/')
+                    })
+                    .catch(error => {
+                        console.log(error)
+                    })
+                }
+            })
+        },
+        getUserInfo() {
+            axios({
+                method: 'post',
+                url: '/api/getUserInfo',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                },
+                data: {
+                    xl_email: this.form.xl_email + '@tongji.edu.cn'
+                }
+            })
+            .then(response => {
+                    this.$store.commit('setUserInfo', response.data.data)
+            })
+            .catch(error => {
+                console.log(error)
+            })
+        },
+        sendVerificationEmail() {
+            const formEl = this.$refs.ruleFormRef
+            if (!formEl) return
+            formEl.validateField('xl_email', (valid) => {
+                if (valid) {
+                    this.emailCounter = 60
+                    const timer = setInterval(() => {
+                        this.emailCounter--
+                        if (this.emailCounter === 0) {
+                            clearInterval(timer)
+                        }
+                    }, 1000)
+                    axios({
+                        method: 'post',
+                        url: '/api/sendVerificationEmail',
+                        data: {
+                            xl_email: this.form.xl_email + '@tongji.edu.cn'
+                        }
+                    })
+                    .then(response => {
                         console.log(response)
                     })
                     .catch(error => {

@@ -51,6 +51,7 @@ u_nickname =
 u_email = 
 u_password = 
 u_created_at = 
+u_receive_noti = 
 
 # Login log table
 l_table_name = 
@@ -59,7 +60,8 @@ l_ip_address =
 l_login_at = 
 
 [Storage]
-path = ./data # 附件文件存储的位置
+attachment_path = ./data # 附件文件存储的位置
+img_path = ./data/background
 
 # 使用代理来转发请求，如果不需要，不用填写这个字段
 # 并把所有网络请求的 proxies=xxx 删除
@@ -84,6 +86,9 @@ smtp_server =
 smtp_port = 
 smtp_username = 
 smtp_password = 
+
+[Session]
+secret_key = 
 ```
 
 在本文件夹下新建一个 `config.ini`，把学号和密码替换为自己的，即可实现登录功能。
@@ -153,7 +158,7 @@ Werkzeug | 3.1.3 | |
 
 ```json
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "cirno@tongji.edu.cn",
     "xl_password": "RSA加密后的密码",
     "xl_veri_code": "233333"
 }
@@ -165,7 +170,6 @@ Werkzeug | 3.1.3 | |
 {
     "code": 200,
     "msg": "成功",
-    "xl_token": "12345"
 }
 ```
 
@@ -177,7 +181,7 @@ Werkzeug | 3.1.3 | |
 
 ```json
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "cirno@tongji.edu.cn",
     "xl_password": "RSA加密后的密码"
 }
 ```
@@ -188,7 +192,6 @@ Werkzeug | 3.1.3 | |
 {
     "code": 200,
     "msg": "成功",
-    "xl_token": "12345"
 }
 ```
 
@@ -200,7 +203,7 @@ Werkzeug | 3.1.3 | |
 
 ```json
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "cirno@tongji.edu.cn",
     "xl_password": "RSA加密后的密码"
 }
 ```
@@ -211,7 +214,6 @@ Werkzeug | 3.1.3 | |
 {
     "code": 200,
     "msg": "成功",
-    "xl_token": "12345"
 }
 ```
 
@@ -223,7 +225,7 @@ Werkzeug | 3.1.3 | |
 
 ```json
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "cirno@tongji.edu.cn",
 }
 ```
 
@@ -244,7 +246,7 @@ Werkzeug | 3.1.3 | |
 
 ```json
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "cirno@tongji.edu.cn",
 }
 ```
 
@@ -267,7 +269,7 @@ Werkzeug | 3.1.3 | |
 
 ```json
 {
-    "xl_username": "admin@tongji.edu.cn",
+    "xl_email": "cirno@tongji.edu.cn",
     "xl_newpassword": "加密后的新密码"
 }
 ```
@@ -340,7 +342,7 @@ Werkzeug | 3.1.3 | |
                 "fileType": "文档 | 表格 | 演示文稿 | 压缩包 | 其他"
             },
             {
-                // ,,,
+                // ...
             },
         ]
         }
@@ -362,3 +364,52 @@ Werkzeug | 3.1.3 | |
 > 返回：
 
 `二进制文件`
+
+### `/api/getUserInfo`
+
+`POST`
+
+> 传入：
+
+```json
+{
+    "xl_email": "cirno@tongji.edu.cn"
+}
+```
+
+> 返回：
+
+```json
+{
+    "code": 200,
+    "msg": "成功",
+    "data": {
+        "xl_nickname": "琪露诺",
+        "xl_email": "cirno@tongji.edu.cn",
+        "xl_created_at": "2019年9月9日 09:09:09",
+        "xl_receive_noti": "true | false"
+    }
+}
+```
+
+### `/api/toggleReceiveNoti`
+
+`POST`
+
+> 传入：
+
+```json
+{
+    "xl_email": "cirno@tongji.edu.cn",
+    "expect_option": "true | false"
+}
+```
+
+> 返回：
+
+```json
+{
+    "code": 200,
+    "msg": "成功"
+}
+```

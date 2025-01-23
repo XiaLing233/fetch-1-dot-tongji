@@ -64,6 +64,7 @@ U_NICKNAME = CONFIG['Table']['u_nickname']
 U_EMAIL = CONFIG['Table']['u_email']
 U_PASSWORD = CONFIG['Table']['u_password']
 U_CREATED_AT = CONFIG['Table']['u_created_at']
+U_RECEIVE_NOTI = CONFIG['Table']['u_receive_noti']
 
 # 读取登录日志表格结构
 
@@ -339,16 +340,16 @@ def sqlFindMyCommonMsgPublishById(notification_id):
 # ----- 用户注册登录部分 ----- #
 
 # 查询用户是否存在
-def sqlUserExist(userName):
+def sqlUserExist(email):
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
     # 查询用户
-    sql = f"SELECT * FROM {U_TABLE_NAME} WHERE {U_NICKNAME} = %s"
+    sql = f"SELECT * FROM {U_TABLE_NAME} WHERE {U_EMAIL} = %s"
 
     print("执行的 SQL 语句是：", sql)
 
-    cursor.execute(sql, (userName,))
+    cursor.execute(sql, (email,))
 
     result = cursor.fetchall()
 
@@ -356,10 +357,10 @@ def sqlUserExist(userName):
     conn.close()
 
     if len(result) == 0:
-        print(f"用户 {userName} 不存在")
+        print(f"用户 {email} 不存在")
         return False
     else:
-        print(f"用户 {userName} 已存在")
+        print(f"用户 {email} 已存在")
         return True
     
 
@@ -439,3 +440,52 @@ def sqlUpdatePassword(email, newPassword):
     else:
         print("更新失败")
         return False
+
+# 获取用户信息
+def sqlGetUserInfo(email):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    print("查询的用户邮箱是：", email)
+
+    # 查询用户的信息
+    sql = f"SELECT {U_NICKNAME}, {U_EMAIL}, { U_CREATED_AT }, { U_RECEIVE_NOTI } FROM {U_TABLE_NAME} WHERE {U_EMAIL} = %s"
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (email,))
+
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    if len(result) == 0:
+        print("用户不存在")
+        return None
+
+    print(result[0])
+
+    return result[0]
+
+# 切换用户是否接收通知
+def sqltoggleReceiveNoti(email, option):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 更新用户的密码
+    sql = f"UPDATE {U_TABLE_NAME} SET {U_RECEIVE_NOTI} = %s WHERE {U_EMAIL} = %s"
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (option, email))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if cursor.rowcount == 1:
+        print("更新成功")
+        return True
+    else:
+        print("更新失败")
