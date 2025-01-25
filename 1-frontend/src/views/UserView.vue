@@ -7,7 +7,7 @@
             </template>
         </el-page-header>
 
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;  background: url('/src/assets/user-bg.png'); background-size: cover; background-position: center; min-height: 800px">
+        <div class="userContainer">
             <el-card
             shadow="never"
             style="margin: 20px 0 20px 0; width: 800px; padding: 10px 30px 0 30px"
@@ -205,3 +205,16 @@ export default {
     }
 }
 </script>
+
+<style>
+.userContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    background: url('@/assets/user-bg.png');
+    background-size: cover;
+    background-position: center;
+    min-height: 800px
+}
+</style>

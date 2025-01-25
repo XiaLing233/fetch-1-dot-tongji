@@ -96,7 +96,7 @@
     >
     <template #header>
         <div style="display: flex; align-items: center">
-            <img src="/src/assets/icon_title.png" style="width: 30px; height: 30px; margin-right: 10px"/>
+            <img src="@/assets/icon_title.png" style="width: 30px; height: 30px; margin-right: 10px"/>
             <h3>{{ noti.title }}</h3>
         </div>
 
@@ -352,7 +352,7 @@
 }
 
 .pdf {
-    background: url('/src/assets/pdf-icon.svg');
+    background: url('@/assets/pdf-icon.svg');
     width: 20px;
     height: 20px;
     margin-right: 6px;
@@ -360,7 +360,7 @@
 }
 
 .doc {
-    background: url('/src/assets/doc-icon.svg');
+    background: url('@/assets/doc-icon.svg');
     width: 20px;
     height: 20px;
     margin-right: 6px;
@@ -368,7 +368,7 @@
 }
 
 .xls {
-    background: url('/src/assets/xls-icon.svg');
+    background: url('@/assets/xls-icon.svg');
     width: 20px;
     height: 20px;
     margin-right: 6px;
@@ -376,7 +376,7 @@
 }
 
 .ppt {
-    background: url('/src/assets/ppt-icon.svg');
+    background: url('@/assets/ppt-icon.svg');
     width: 20px;
     height: 20px;
     margin-right: 6px;
@@ -384,7 +384,7 @@
 }
 
 .rar {
-    background: url('/src/assets/rar-icon.svg');
+    background: url('@/assets/rar-icon.svg');
     width: 20px;
     height: 20px;
     margin-right: 6px;

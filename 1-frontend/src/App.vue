@@ -18,8 +18,7 @@ import { RouterView } from 'vue-router';
                 </el-text>
               </div>
             <div class="edu-item">
-            <!-- 需要使用根路径，不能用相对路径 -->
-            <el-avatar src="/src/assets/male.png" size="default"></el-avatar>
+            <el-avatar :src="malePNG" size="default"></el-avatar>
           </div>
           <div class="edu-item" style="margin-top: 12px" id="personalInfo">
             <el-dropdown>
@@ -56,7 +55,7 @@ import { RouterView } from 'vue-router';
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu slot="dropdown">
-                    <a href="https://github.com/XiaLing233/fetch-1-dot-tongji" target="_blank" style="text-decoration: none;"><el-dropdown-item><img src="/src/assets/github-mark.svg" alt="github" style="width: 15px; height: 15px; margin-right: 10px">Github 仓库</el-dropdown-item></a>
+                    <a href="https://github.com/XiaLing233/fetch-1-dot-tongji" target="_blank" style="text-decoration: none;"><el-dropdown-item><img src="@/assets/github-mark.svg" alt="github" style="width: 15px; height: 15px; margin-right: 10px">Github 仓库</el-dropdown-item></a>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -85,7 +84,7 @@ import { RouterView } from 'vue-router';
 }
 
 .edu-header-logo {
-  background: url('assets/my_icon_logo.png');
+  background: url('@/assets/my_icon_logo.png');
   width: 380px;
   height: 40px;
   float: left;
@@ -103,24 +102,6 @@ import { RouterView } from 'vue-router';
   align-items: center;
 }
 
-.edu-menu-icon {
-  margin-top: 5px;
-  margin-right: 10px;
-  background: url('/src/assets/menu-open.png');
-  width: 30px;
-  height: 30px;
-  background-size: cover;
-  background-position: center;
-  transform: rotate(-90deg);
-}
-
-.edu-item-mobile {
-  margin: 18px 0;
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-}
-
 .open {
   transform: rotate(0deg);
 }
@@ -128,14 +109,16 @@ import { RouterView } from 'vue-router';
 </style>
 
 <script>
-  import { ArrowDown } from '@element-plus/icons-vue'
+  import { ArrowDown } from '@element-plus/icons-vue';
   import { Menu } from '@element-plus/icons-vue';
-  import axios from 'axios'
+  import axios from 'axios';
+  import malePNG from '@/assets/male.png';
 
   export default {
     data() {
       return {
-        openMenu: false
+        openMenu: false,
+        malePNG
       }
     },
     created() {
@@ -145,7 +128,7 @@ import { RouterView } from 'vue-router';
     },
     components: {
       ArrowDown,
-      Menu
+      Menu,
     },
     methods:
     {

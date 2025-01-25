@@ -40,8 +40,8 @@ STU_NO = CONFIG['Account']['sno']
 # 邮件
 SMTP_SERVER = CONFIG['Email']['smtp_server']
 SMTP_PORT = CONFIG['Email']['smtp_port']
-SMTP_USERNAME = CONFIG['Email']['smtp_username']
-SMTP_PASSWORD = CONFIG['Email']['smtp_password']
+SMTP_USERNAME = CONFIG['Email']['smtp_username_batch'] # 是营销邮件，需要批量发送
+SMTP_PASSWORD = CONFIG['Email']['smtp_password_batch']
 
 U_NICKNAME = CONFIG['Table']['u_nickname']
 U_EMAIL = CONFIG['Table']['u_email']
@@ -326,6 +326,7 @@ def processEvents(session, events):
                     time.sleep(5) # 不要频繁请求
 
     # 退出登录
+    time.sleep(60) # 至少等待 1 分钟再退出登录
     logout_data = {
         "sessionid": session.cookies.get_dict()['sessionid'],
         "uid": STU_NO,
@@ -379,8 +380,8 @@ def processEvents(session, events):
 
 # ----- 生产环境 ----- #
 
-# session = login()
+session = login()
 
-# events = findMyCommonMsgPublish(session)
+events = findMyCommonMsgPublish(session)
 
-# processEvents(session, events)
+processEvents(session, events)
