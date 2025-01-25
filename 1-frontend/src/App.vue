@@ -4,16 +4,24 @@ import { RouterView } from 'vue-router';
 <template>
     <el-container>
       <el-header>
-        <div class="edu-header-left">
+        <div class="edu-header-left" style="display: flex;">
           <a href="/"><div class="edu-header-logo"></div></a>
         </div>
         <div class="edu-header-right">
-          <div  v-if="this.$store.state.isLoggedin" style="display: flex;">
-            <div class="edu-item" v-if="this.$store.state.isLoggedin">
+          <div v-if="this.$store.state.isLoggedin" style="display: flex;">
+            <div class="edu-item" style="margin-top: 8px">
+                <el-text type="info">
+                    {{ this.$store.state.userInfo.xl_login_log.length > 1 ? '上次登录：' : '首次登录' }}
+                </el-text>
+                <el-text v-if="this.$store.state.userInfo.xl_login_log.length > 1">
+                      {{ this.$store.state.userInfo.xl_login_log[1]['login_at'] }}
+                </el-text>
+              </div>
+            <div class="edu-item">
             <!-- 需要使用根路径，不能用相对路径 -->
-            <el-avatar src="/src/assets/male.png" size="default"></el-avatar> 
+            <el-avatar src="/src/assets/male.png" size="default"></el-avatar>
           </div>
-          <div class="edu-item" v-if="this.$store.state.isLoggedin" style="margin-top: 12px">
+          <div class="edu-item" style="margin-top: 12px" id="personalInfo">
             <el-dropdown>
               <span class="el-dropdown-link">
                 {{ this.$store.state.userInfo.xl_nickname }}
@@ -77,10 +85,11 @@ import { RouterView } from 'vue-router';
 }
 
 .edu-header-logo {
-  background: url('assets/icon_logo.png');
+  background: url('assets/my_icon_logo.png');
   width: 380px;
   height: 40px;
   float: left;
+  margin-top: 4px;
 }
 
 .edu-item {
@@ -94,18 +103,49 @@ import { RouterView } from 'vue-router';
   align-items: center;
 }
 
+.edu-menu-icon {
+  margin-top: 5px;
+  margin-right: 10px;
+  background: url('/src/assets/menu-open.png');
+  width: 30px;
+  height: 30px;
+  background-size: cover;
+  background-position: center;
+  transform: rotate(-90deg);
+}
+
+.edu-item-mobile {
+  margin: 18px 0;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+
+.open {
+  transform: rotate(0deg);
+}
+
 </style>
 
 <script>
   import { ArrowDown } from '@element-plus/icons-vue'
+  import { Menu } from '@element-plus/icons-vue';
+  import axios from 'axios'
+
   export default {
+    data() {
+      return {
+        openMenu: false
+      }
+    },
     created() {
         if (window.innerWidth < 768) {
             this.$store.commit('setIsMobile', true)
         }
     },
     components: {
-      ArrowDown
+      ArrowDown,
+      Menu
     },
     methods:
     {
@@ -113,7 +153,26 @@ import { RouterView } from 'vue-router';
         // 清空 vuex 中的所有数据
         this.$store.commit('logout')
         this.$router.push('/login')
+        // 让后端清除 cookie
+        axios({
+          method: 'get',
+          url: '/api/logout',
+          headers: {
+            'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+          },
+        })
+        .then(response => {
+          console.log(response)
+        })
+        .catch(error => {
+          console.log(error)
+        })
+      },
+      handleMenu()
+      {
+        this.openMenu = !this.openMenu
+        console.log(this.openMenu)
       }
-    }
+    },
 }
 </script>

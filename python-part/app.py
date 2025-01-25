@@ -2,7 +2,7 @@
 
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, set_access_cookies
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, set_access_cookies, unset_access_cookies
 from flask_mail import Mail, Message
 from flask_session import Session
 from packages import tjSql, myDecrypt
@@ -142,6 +142,14 @@ def checkEmailFormat(email):
 def generateVerificationCode():
     return str(random.randint(100000, 999999))
 
+# 获取 IP 地址
+def get_client_ip():
+    # 首先检查是否有 X-Forwarded-For 头部
+    if 'X-Forwarded-For' in request.headers:
+        # 获取第一个 IP 地址（有可能是代理链中的第一个）
+        return request.headers.getlist('X-Forwarded-For')[0].split(',')[0] # 返回第一个 IP 地址，因为有 cloudflare 的代理，所以可能有多个 IP 地址
+    # 如果没有，使用 request.remote_addr 获取客户端的 IP 地址
+    return request.remote_addr
 
 # ----- API ----- #
 
@@ -208,6 +216,13 @@ def sendVerificationEmail():
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
         }), 400
 
+    # 检查用户名是否存在
+    if tjSql.sqlUserExist(xl_email) == True:
+        return jsonify({
+            'code': 400,
+            'msg': '用户已注册，请登录'
+        }), 400
+    
     # 检查发送频率限制
     current_time = time.time()
     last_send_time = session.get('send_time', 0)
@@ -337,12 +352,12 @@ def register():
     if tjSql.sqlUserExist(xl_email) == True:
         return jsonify({
             'code': 400,
-            'msg': '用户已存在'
+            'msg': '用户已注册，请登录'
         }), 400
 
     # 检查验证码
-    print("session中的验证码：", session.get('verification_code'))
-    print("传入的验证码：", xl_veri_code)
+    # print("session中的验证码：", session.get('verification_code'))
+    # print("传入的验证码：", xl_veri_code)
     if session.get('verification_code') != xl_veri_code:
         return jsonify({
             'code': 400,
@@ -367,6 +382,9 @@ def register():
     tz = pytz.timezone('Asia/Shanghai')
     current_time = datetime.datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
     tjSql.sqlInsertUser(nickname, xl_email, hashed_password, current_time)
+
+    # 登录日志
+    tjSql.sqlUpdateLoginLog(xl_email, get_client_ip(), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     # 返回 token
     access_token = create_access_token(identity=xl_email)
@@ -411,7 +429,8 @@ def login():
     if tjSql.sqlUserExist(xl_email) == False:
         return jsonify({
             'code': 400,
-            'msg': '用户不存在'
+            # 'msg': '用户不存在'
+            'msg': '用户名或密码错误'
         }), 400
     
     # 解密密码
@@ -423,11 +442,17 @@ def login():
     print("数据库中的密码：", hashed_password)
 
     # 验证密码
-    if PasswordHasher().verify(hashed_password, xl_password) == False:
+    try: 
+        PasswordHasher().verify(hashed_password, xl_password)
+    except:
         return jsonify({
             'code': 400,
-            'msg': '密码错误'
+            # 'msg': '密码错误'
+            'msg': '用户名或密码错误'
         }), 400
+
+    # 登录日志
+    tjSql.sqlUpdateLoginLog(xl_email, get_client_ip(), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     # 返回 token
     access_token = create_access_token(identity=xl_email)
@@ -467,6 +492,9 @@ def recovery():
     xl_password = request.json.get('xl_password')
     xl_veri_code = request.json.get('xl_veri_code')
 
+    print("session中的验证码：", session.get('verification_code'))
+    print("传入的验证码：", xl_veri_code)
+
     # 检查邮箱格式
     if checkEmailFormat(xl_email) == False:
         return jsonify({
@@ -502,6 +530,9 @@ def recovery():
 
     # 更新密码
     tjSql.sqlUpdatePassword(xl_email, hashed_password)
+
+    # 登录日志
+    tjSql.sqlUpdateLoginLog(xl_email, get_client_ip(), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     # 返回 token
     access_token = create_access_token(identity=xl_email)
@@ -593,6 +624,8 @@ def findMyCommonMsgPublish():
     # 查询通知
     data = tjSql.sqlFindMyCommonMsgPublish()
 
+    # time.sleep(5) # 模拟网络延迟
+
     return jsonify({
         'code': 200,
         'msg': '成功',
@@ -662,8 +695,12 @@ def downloadAttachmentByFileName():
     # 获取参数
     fileLocation = request.json.get('fileLocation')
 
+    print("文件位置：", fileLocation)
+
     # 解密文件名
     filePath = myDecrypt.decryptFilePath(fileLocation)
+
+    print("文件路径：", filePath)
 
     # 读取文件
     with open(f'{ATTACHMENT_PATH}/{filePath}', 'rb') as f:
@@ -682,6 +719,8 @@ def getUserInfo():
 
     # 查询用户信息
     data = tjSql.sqlGetUserInfo(xl_email)
+    # 查询登录信息
+    data_login = tjSql.sqlGetLoginLog(xl_email)
 
     print(data)
 
@@ -690,7 +729,8 @@ def getUserInfo():
         'xl_nickname': data[0],
         'xl_email': data[1],
         'xl_created_at': data[2].strftime('%Y年%m月%d日 %H:%M:%S'),
-        'xl_receive_noti': bool(data[3])
+        'xl_receive_noti': bool(data[3]),
+        'xl_login_log': data_login
     }
 
     return jsonify({
@@ -713,3 +753,17 @@ def toggleReceiveNoti():
         'code': 200,
         'msg': '成功'
     }), 200
+
+# 退出登录
+@app.route('/api/logout', methods=['GET'])
+@jwt_required()
+def logout():
+    # 清除 cookie
+    response = jsonify({
+        'code': 200,
+        'msg': '成功'
+    })
+
+    unset_access_cookies(response)
+
+    return response, 200

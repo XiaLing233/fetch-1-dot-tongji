@@ -110,6 +110,7 @@
 <script>
 import axios from 'axios'
 import { passwordEncrypt } from '@/utils/xl_encrypt';
+import { ElMessage } from 'element-plus';
 
 export default {
     data() {
@@ -176,6 +177,10 @@ export default {
                     })
                     .catch(error => {
                         console.log(error)
+                        ElMessage({
+                            message: error.response.data.msg,
+                            type: 'error'
+                        })
                     })
                 }
             })
@@ -204,13 +209,6 @@ export default {
             if (!formEl) return
             formEl.validateField('xl_email', (valid) => {
                 if (valid) {
-                    this.emailCounter = 60
-                    const timer = setInterval(() => {
-                        this.emailCounter--
-                        if (this.emailCounter === 0) {
-                            clearInterval(timer)
-                        }
-                    }, 1000)
                     axios({
                         method: 'post',
                         url: '/api/sendVerificationEmail',
@@ -220,9 +218,20 @@ export default {
                     })
                     .then(response => {
                         console.log(response)
+                        this.emailCounter = 60
+                        const timer = setInterval(() => {
+                            this.emailCounter--
+                            if (this.emailCounter === 0) {
+                                clearInterval(timer)
+                            }
+                        }, 1000)
                     })
                     .catch(error => {
                         console.log(error)
+                        ElMessage({
+                            message: error.response.data.msg,
+                            type: 'error'
+                        })
                     })
                 }
             })

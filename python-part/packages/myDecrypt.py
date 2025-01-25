@@ -45,19 +45,29 @@ def decryptFilePath(encrypted_file_path):
     # URL 解码
     encrypted_file_path = unquote_plus(encrypted_file_path)
 
+    print(encrypted_file_path)
+
     # base64 解码
     encrypted_file_path = base64.b64decode(encrypted_file_path)
     
+    print(encrypted_file_path)
+
     # AES 解密
     cipher = AES.new(AES_KEY.encode(), AES.MODE_CBC, AES_IV.encode())
     decrypted_file_path = cipher.decrypt(encrypted_file_path)
     
+    print(decrypted_file_path)
+
     # PKCS7 去填充
     decrypted_file_path = unpad(decrypted_file_path, 16)
 
+    print(decrypted_file_path)
+    
     # 去 URI 编码
     decrypted_file_path = unquote_plus(decrypted_file_path.decode())
     
+    print(decrypted_file_path)
+
     return decrypted_file_path
 
 # from urllib.parse import quote_plus # URL 编码

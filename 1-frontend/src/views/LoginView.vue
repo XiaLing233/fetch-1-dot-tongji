@@ -155,6 +155,10 @@ export default {
                     })
                     .catch(error => {
                         console.log(error)
+                        ElMessage({
+                            message: error.response.data.msg,
+                            type: 'error'
+                        })
                     })
                 }
             })

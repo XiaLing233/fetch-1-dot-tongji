@@ -111,6 +111,7 @@
 <script>
 import axios from 'axios'
 import { passwordEncrypt } from '@/utils/xl_encrypt';
+import { ElMessage } from 'element-plus';
 
 export default {
     data() {
@@ -134,8 +135,8 @@ export default {
                 { pattern: /^[0-9]{6}$/, message: '验证码格式错误', trigger: 'blur' }
             ],
             xl_password: [
-                { required: true, message: '请输入密码', trigger: 'blur' },
-                { pattern: /^[a-zA-Z0-9_.-]{6,20}$/, message: '密码格式错误', trigger: 'blur' }
+                { required: true, message: '请输入新密码', trigger: 'blur' },
+                { min: 8, max: 20, message: '密码长度在8-20个字符之间', trigger: 'blur' }
             ],
             xl_password_confirm: [
                 { required: true, message: '请再次输入密码', trigger: 'blur' },
@@ -161,12 +162,14 @@ export default {
                         url: '/api/recovery',
                         data: {
                             xl_email: this.form.xl_email + '@tongji.edu.cn',
-                            xl_password: passwordEncrypt(this.form.xl_password)
+                            xl_password: passwordEncrypt(this.form.xl_password),
+                            xl_veri_code: this.form.xl_veri_code
                         }
                     })
                     .then(response => { 
                         console.log(response)
                         this.$store.commit('login')
+                        console.log("12345")
                         this.getUserInfo()
                         ElMessage({
                             message: '找回密码成功',
@@ -176,6 +179,10 @@ export default {
                     })
                     .catch(error => {
                         console.log(error)
+                        ElMessage({
+                            message: error.response.data.msg,
+                            type: 'error'
+                        })
                     })
                 }
             })
@@ -197,6 +204,10 @@ export default {
             })
             .catch(error => {
                 console.log(error)
+                ElMessage({
+                    message: error.response.data.msg,
+                    type: 'error'
+                })
             })
         },
         sendRecoveryEmail() {
@@ -204,13 +215,6 @@ export default {
             if (!formEl) return
             formEl.validateField('xl_email', (valid) => {
                 if (valid) {
-                    this.emailCounter = 60
-                    const timer = setInterval(() => {
-                        this.emailCounter--
-                        if (this.emailCounter === 0) {
-                            clearInterval(timer)
-                        }
-                    }, 1000)
                     axios({
                         method: 'post',
                         url: '/api/sendRecoveryEmail',
@@ -220,9 +224,20 @@ export default {
                     })
                     .then(response => {
                         console.log(response)
+                        this.emailCounter = 60
+                        const timer = setInterval(() => {
+                            this.emailCounter--
+                            if (this.emailCounter === 0) {
+                                clearInterval(timer)
+                            }
+                        }, 1000)
                     })
                     .catch(error => {
                         console.log(error)
+                        ElMessage({
+                            message: error.response.data.msg,
+                            type: 'error'
+                        })
                     })
                 }
             })

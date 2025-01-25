@@ -59,7 +59,7 @@ R_ATTACHMENT_ID = CONFIG['Table']['r_attachment_id']
 # 读取用户表格结构
 
 U_TABLE_NAME = CONFIG['Table']['u_table_name']
-# U_ID = CONFIG['Table']['u_id']
+U_ID = CONFIG['Table']['u_id']
 U_NICKNAME = CONFIG['Table']['u_nickname']
 U_EMAIL = CONFIG['Table']['u_email']
 U_PASSWORD = CONFIG['Table']['u_password']
@@ -105,7 +105,7 @@ def sqlInsertNotification(notification):
     conn.close()
 
 # 向数据库中插入附件
-def SqlInsertAttachment(attachment, localFilePath):
+def sqlInsertAttachment(attachment, localFilePath):
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
@@ -127,7 +127,7 @@ def SqlInsertAttachment(attachment, localFilePath):
 
 # 向数据库中插入关系
 # 关系的主键是自增的，所以不需要传入
-def SQlInsertRelation(notification_id, attachment_id):
+def sqlInsertRelation(notification_id, attachment_id):
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
@@ -239,6 +239,15 @@ def sqlFindMyCommonMsgPublish():
         item[N_CREATE_TIME] = item[N_CREATE_TIME].strftime("%Y-%m-%d %H:%M:%S")
         item[N_PUBLISH_TIME] = item[N_PUBLISH_TIME].strftime("%Y-%m-%d %H:%M:%S")
         item[N_INVALID_TOP_TIME] = item[N_INVALID_TOP_TIME].strftime("%Y-%m-%d %H:%M:%S")
+
+    # 增加一列表示状态
+    for item in result:
+        if item[N_INVALID_TOP_TIME] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
+            item['status'] = "置顶"
+        elif item[N_END_TIME] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
+            item['status'] = "发布中"
+        else:
+            item['status'] = "已过期"
     
     print("查询到的通知数量是：", len(result))
     # print("查询到的通知是：", result)
@@ -329,15 +338,17 @@ def sqlFindMyCommonMsgPublishById(notification_id):
         # 判断附件的类型，新建 fileType 字段
         filename = attachment_info[A_FILENAME]
         if ".doc" in filename:
-            attachment_info['fileType'] = "文档"
+            attachment_info['fileType'] = "doc"
         elif ".xls" in filename:
-            attachment_info['fileType'] = "表格"
+            attachment_info['fileType'] = "xls"
         elif ".ppt" in filename:
-            attachment_info['fileType'] = "演示文稿"
+            attachment_info['fileType'] = "ppt"
         elif ".zip" in filename or ".rar" in filename:
-            attachment_info['fileType'] = "压缩包"
+            attachment_info['fileType'] = "rar"
+        elif ".pdf" in filename:
+            attachment_info['fileType'] = "pdf"
         else:
-            attachment_info['fileType'] = "其他"
+            attachment_info['fileType'] = "other"
         print("查询到的附件信息是：", attachment_info)
         attachment_list.append(attachment_info)
 
@@ -514,3 +525,115 @@ def sqltoggleReceiveNoti(email, option):
         return True
     else:
         print("更新失败")
+
+
+# 获取所有要接受通知的用户邮箱
+def sqlGetAllReceiveNotiUser():
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 查询用户的邮箱
+    sql = f"SELECT { U_NICKNAME }, {U_EMAIL} FROM {U_TABLE_NAME} WHERE {U_RECEIVE_NOTI} = 1"
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql)
+
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    # 转换为字典
+    result = [dict(zip(cursor.column_names, row)) for row in result]
+
+    print("查询到的用户邮箱是：", result)
+
+    return result
+
+# 通过邮箱获取用户 ID
+def sqlGetUserIdByEmail(email):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 查询用户的 ID
+    sql = f"SELECT { U_ID } FROM {U_TABLE_NAME} WHERE {U_EMAIL} = %s"
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (email,))
+
+    result = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    if len(result) == 0:
+        print("用户不存在")
+        return None
+
+    return result[0][0]
+
+# 更新登录记录
+def sqlUpdateLoginLog(email, ip_address, login_at):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 查询用户的 ID
+    user_id = sqlGetUserIdByEmail(email)
+
+    # 插入登录记录
+    sql = (
+        f"INSERT INTO {L_TABLE_NAME} "
+        f"({L_USER_ID}, {L_IP_ADDRESS}, {L_LOGIN_AT}) "
+        f"VALUES (%s, %s, %s)"
+    )
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (user_id, ip_address, login_at))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if cursor.rowcount == 1:
+        print("插入成功")
+        return True
+    else:
+        print("插入失败")
+        return False
+    
+# 查询登录记录
+def sqlGetLoginLog(email):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 查询用户的 ID
+    user_id = sqlGetUserIdByEmail(email)
+
+    # 查询登录记录
+    sql = f"SELECT { L_IP_ADDRESS }, { L_LOGIN_AT } FROM {L_TABLE_NAME} WHERE {L_USER_ID} = %s ORDER BY {L_LOGIN_AT} DESC LIMIT 10"
+
+    print("执行的 SQL 语句是：", sql)
+
+    cursor.execute(sql, (user_id,))
+
+    result = cursor.fetchall()
+
+    print(result)
+
+    # 时间转换为中文格式，原始数据是元组
+    result = [(item[0], item[1].strftime("%Y-%m-%d %H:%M:%S")) for item in result]
+
+    # 转换为字典
+    result = [dict(zip(cursor.column_names, row)) for row in result]
+
+    cursor.close()
+    conn.close()
+
+    if len(result) == 0:
+        print("登录记录不存在")
+        return None
+
+    return result

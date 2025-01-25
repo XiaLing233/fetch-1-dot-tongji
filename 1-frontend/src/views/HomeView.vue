@@ -1,17 +1,35 @@
 <template>
     <div style="background-color: #f0f0f0; width: 100%; ; margin-top: 20px;">
+        <div v-if="this.$store.state.isLoggedin">
+        <el-alert title="初次使用? 点此开始新手引导" type="success" style="margin-top: 20px" @click="beginTour = true"/>
+        </div>
         <el-card
         style="margin: 20px auto; min-height: 800px;"
         shadow="never"
     >
+    <div style="display: flex; justify-content: space-between; align-items: center;">
         <h4>通知公告</h4>
+        <div id="searchTitle">
+            <el-input
+            v-model="search"
+            placeholder="检索标题"
+            style="max-width: 300px"
+            @input="handleSearch"
+        >
+        <template #prepend>
+            <el-icon><Search /></el-icon>
+        </template>
+        </el-input>
+        </div>
+    </div>
         <el-table
-            :data="tableData"
+            :data="paginatedData"
             style="width: 100%"
             :row-class-name="defRowLevel"
             height="600"
             stripe
             @row-click="findMyCommonMsgPublishById"
+            @filter-change="handleFilter"
             >
             <el-table-column
                 prop="title"
@@ -25,12 +43,40 @@
             <el-table-column
                 prop="end_time"
                 label="结束时间">
-            </el-table-column
-        >
-
+            </el-table-column>
+            <el-table-column
+                prop="status"
+                label="状态"
+                :filters="[
+                    { text: '置顶', value: '置顶' },
+                    { text: '发布中', value: '发布中' },
+                    { text: '已过期', value: '已过期' }
+                ]"
+                >
+                <template #default="scope">
+                    <el-tag 
+                        :type="scope.row.status === '置顶' ? 'danger' : scope.row.status === '发布中' ? 'success' : 'info'"
+                    >
+                        {{ scope.row.status }}
+                    </el-tag>
+                </template>
+            </el-table-column>
         </el-table>
+        <div style="display: flex; justify-content: flex-end; margin-top: 20px; max-width: 100vw">
+            <el-pagination
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+            :current-page="pagi.currentPage"
+            :page-sizes="[20, 50, 100, 500, 1000]"
+            :page-size="pagi.pageSize"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="pagi.total"
+        />
+        </div>
+
     </el-card>
     </div>
+    <!-- 提示区 -->
     <el-dialog
         v-model="openAlertDialog"
         title="提示"
@@ -65,24 +111,53 @@
             <p>附件下载：</p>
             <ol>
                 <li v-for="attachment in noti.attachments">
-                    <span>{{ attachment.filename }}</span>
+                    <!-- 根据附件的类型在前方插入图标 -->
+                     <div style="display: flex; align-items: baseline;">
+                        <div :class="attachment.fileType"></div>
+                        <div style="margin-bottom: 2px;">
+                            <span class="notiAttachment" @click="downloadAttachmentByFileName(attachment.filename)">{{ attachment.filename }}</span>
+                        </div>
+                     </div>
+                    
                 </li>
             </ol>
         </div>
     </el-scrollbar>
     </el-dialog>
-   
+    <div 
+        v-loading.fullscreen.lock="isLoading"
+        element-loading-text="Loading"></div>
+    <!-- 导览区 -->
+     <el-tour v-model="beginTour">
+        <el-tour-step target="#personalInfo" title="个人信息维护">
+            <el-text>点击这里可以管理个人信息、控制通知邮件的发送等</el-text>
+        </el-tour-step>
+        <el-tour-step target="#searchTitle" title="检索标题">
+            <el-text>在这里输入标题的关键字，可以检索到相关的通知公告</el-text>
+        </el-tour-step>
+        <el-tour-step target=".el-table__column-filter-trigger" title="状态筛选">
+            <el-text>点击下箭头，可以筛选通知公告的状态</el-text>
+        </el-tour-step>
+        <el-tour-step target=".top-row" title="查看通知公告">
+            <el-text>点击通知公告的所在行，可以查看通知公告的详细内容</el-text>
+        </el-tour-step>
+     </el-tour>
 </template>
 
 <script>
     import axios from 'axios'
+    import { urlEncrypt } from '@/utils/xl_encrypt';
+    import { ElMessage } from 'element-plus';
+    import { Search } from '@element-plus/icons-vue'
 
     export default {
         data() {
             return {
                 tableData: [],
+                tempTableData: [],
                 openAlertDialog: false,
                 openNotiDialog: false,
+                search: '',
                 noti: {
                     title: '',
                     content: '',
@@ -92,17 +167,42 @@
                         fileType: '',
                     }
                 },
+                pagi: {
+                    currentPage: 1,
+                    pageSize: 20,
+                    total: 0
+                },
+                isLoading: false,
+                beginTour: false
             }
         },
         mounted() {
+            this.isLoading = true
             axios({
                 url: '/api/findMyCommonMsgPublish',
                 method: 'get',
             })
             .then(res => {
+                this.isLoading = false
                 console.log(res)
                 this.tableData = res.data.data
+                // 把时间戳转换为日期格式
+                this.tableData.forEach(row => {
+                    row.publish_time = new Date(row.publish_time).toLocaleDateString()
+                    row.end_time = new Date(row.end_time).toLocaleDateString()
+                })
+                this.pagi.total = this.tableData.length
+                this.tempTableData = this.tableData
                 console.log(this.tableData)
+            })
+            .catch(err => {
+                this.isLoading = false
+                console.log(err)
+                ElMessage({
+                    message: "未登录",
+                    type: 'error'
+                })
+                this.$store.commit('logout')
             })
         },
         methods:
@@ -115,44 +215,181 @@
                 else {
                     return ''
                 }
-        },
-        findMyCommonMsgPublishById(row) {
-            if (this.$store.state.isLoggedin) {
-            axios({
-                url: '/api/findMyCommonMsgPublishById',
-                method: 'post',
-                headers: {
-                    'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
-                },
-                data: {
-                    id: row.id
+            },
+            findMyCommonMsgPublishById(row) {
+                if (this.$store.state.isLoggedin) {
+                    this.isLoading = true
+                    // 如果 cookie 为空，说明在另一个窗口退出了，这时候需要重新登录
+                    if (!document.cookie) {
+                        this.isLoading = false
+                        ElMessage({
+                            title: '提示',
+                            message: '您还未登录，请先登录',
+                            type: 'warning',
+                            grouping: true
+                        })
+                        return
+                    }
+                    axios({
+                        url: '/api/findMyCommonMsgPublishById',
+                        method: 'post',
+                        headers: {
+                            'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                        },
+                        data: {
+                            id: row.id
+                        }
+                    })
+                    .then(res => {
+                        this.noti.title = res.data.data.title
+                        this.noti.content = res.data.data.content
+                        this.noti.publish_time = res.data.data.publish_time
+                        this.noti.attachments = res.data.data.attachments
+                        this.openNotiDialog = true
+                        this.isLoading = false
+                    })
+                    .catch(err => {
+                        ElMessage({
+                            message: err.response.data.msg,
+                            type: 'error'
+                        })
+                        // 一般出现这种情况，是因为 token 过期了
+                        this.$store.commit('logout')
+                        this.$router.push('/login')
+                        this.isLoading = false
+                    })
                 }
-            })
-            .then(res => {
-                this.noti.title = res.data.data.title
-                this.noti.content = res.data.data.content
-                this.noti.publish_time = res.data.data.publish_time
-                this.noti.attachments = res.data.data.attachments
-                this.openNotiDialog = true
-            })
-            .catch(err => {
-                // 一般出现这种情况，是因为 token 过期了
-                this.$store.commit('logout')
-                this.$router.push('/login')
-            })
-        }
-            else
-            {
-                this.openAlertDialog = true
+                else
+                {
+                    this.openAlertDialog = true
+                }
+            },
+            downloadAttachmentByFileName(filename) {
+                // 如果 cookie 为空，说明在另一个窗口退出了，这时候需要重新登录
+                if (!document.cookie) {
+                    this.isLoading = false
+                    ElMessage({
+                        title: '提示',
+                        message: '您还未登录，请先登录',
+                        type: 'warning',
+                        grouping: true
+                    })
+                    return
+                }
+                let encryptedFilename = urlEncrypt(filename);
+                axios({
+                    url: '/api/downloadAttachmentByFileName',
+                    method: 'post',
+                    headers: {
+                        'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                    },
+                    data: {
+                        fileLocation: encryptedFilename
+                    },
+                    responseType: 'blob'
+                })
+                .then(res => {
+                    const url = window.URL.createObjectURL(new Blob([res.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', filename);
+                    document.body.appendChild(link);
+                    link.click();
+                    URL.revokeObjectURL(url);
+                })
+                .catch(err => {
+                    console.log(err)
+                })       
+                },
+            handleSizeChange(val) {
+                this.pagi.pageSize = val
+            },
+            handleCurrentChange(val) {
+                this.pagi.currentPage = val
+            },
+            // 当表格的筛选条件发生变化的时候会触发该事件，参数的值是一个对象，对象的 key 是 column 的 columnKey，对应的 value 为用户选择的筛选条件的数组。
+            handleFilter(filters) {
+                console.log(filters)
+                const status = filters['el-table_1_column_4']
+                if (status.length === 0) {
+                    this.tempTableData = this.tableData
+                }
+                else {
+                    this.tempTableData = this.tableData.filter(row => status.includes(row.status))
+                }
+                this.pagi.total = this.tempTableData.length
             }
-    }
-}
+        },
+        computed: {
+            paginatedData() {
+                const start = (this.pagi.currentPage - 1) * this.pagi.pageSize
+                const end = start + this.pagi.pageSize
+                return this.tempTableData.slice(start, end)
+            },
+            handleSearch() {
+                this.tempTableData = this.tableData.filter(row => row.title.includes(this.search))
+            }
+        },
+        components: {
+            Search,
+        }
 }
 
 </script>
 
 <style>
 .el-table .top-row {
-  --el-table-tr-bg-color: var(--el-color-danger-light-9);
+  --el-table-tr-bg-color: var(--el-color-warning-light-9);
 }
+
+.notiAttachment {
+    color: #409EFF;
+    cursor: pointer;
+}
+
+.notiAttachment:hover {
+    text-decoration: underline;
+}
+
+.pdf {
+    background: url('/src/assets/pdf-icon.svg');
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    background-size: cover;
+}
+
+.doc {
+    background: url('/src/assets/doc-icon.svg');
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    background-size: cover;
+}
+
+.xls {
+    background: url('/src/assets/xls-icon.svg');
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    background-size: cover;
+}
+
+.ppt {
+    background: url('/src/assets/ppt-icon.svg');
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    background-size: cover;
+}
+
+.rar {
+    background: url('/src/assets/rar-icon.svg');
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    background-size: cover;
+}
+
+
 </style>

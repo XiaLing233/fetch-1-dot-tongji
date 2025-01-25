@@ -6,8 +6,16 @@ from packages import myEncrypt # 用于加密密码
 import time # 生成时间戳
 import configparser # 读取配置文件
 from urllib.parse import urlencode # 用于编码请求体
-from packages.tjSql import sqlInsertNotification, sqlHaveRecorded, SqlInsertAttachment, SQlInsertRelation  # 用于写入数据库
+from packages.tjSql import sqlInsertNotification, sqlHaveRecorded, sqlInsertAttachment, sqlInsertRelation, sqlGetAllReceiveNotiUser  # 用于写入数据库
 import json
+
+# 邮件
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
+import smtplib
+
+# 数据库
 
 # 读取配置文件
 CONFIG = configparser.ConfigParser()
@@ -24,11 +32,19 @@ PROXIES = {
 }
 
 # 存储文件的路径
-STORE_PATH = CONFIG['Storage']['path'] # 末尾没有斜杠
+STORE_PATH = CONFIG['Storage']['attachment_path'] # 末尾没有斜杠
 
 # 学号
 STU_NO = CONFIG['Account']['sno']
-# 调试
+
+# 邮件
+SMTP_SERVER = CONFIG['Email']['smtp_server']
+SMTP_PORT = CONFIG['Email']['smtp_port']
+SMTP_USERNAME = CONFIG['Email']['smtp_username']
+SMTP_PASSWORD = CONFIG['Email']['smtp_password']
+
+U_NICKNAME = CONFIG['Table']['u_nickname']
+U_EMAIL = CONFIG['Table']['u_email']
 
 def debug_response(step, response):
     print("第", step, "步：\n")
@@ -237,6 +253,44 @@ def handleDownloadfile(session, attachment):
 
     return localFilePath.replace(STORE_PATH + "/", "") # 返回相对路径
     
+# 发送新活动邮件
+# event 是一个元组，包含 title 和 content 等
+def sendNotiEmail(event):
+    # 获取收件人列表，包含昵称和邮箱
+    to_list = sqlGetAllReceiveNotiUser()
+
+    # 创建邮件
+    for to in to_list:
+        msg = MIMEMultipart()
+        msg['From'] = formataddr(["琪露诺bot", SMTP_USERNAME])
+        msg['To'] = to[U_EMAIL]
+        # 标题带同济大学可能会被拦截，把同济改成TJ
+        msg['Subject'] = "1系统发布了新内容：" + event['title']
+
+        # 邮件正文，HTML 格式
+        msg.attach(MIMEText(f"尊敬的 {to[U_NICKNAME]}：", 'html'))
+        msg.attach(MIMEText(event['content'], 'html'))
+
+        # 把附件名称加入邮件，不要附件内容
+        if (event['commonAttachmentList'] != None): # 有附件
+            msg.attach(MIMEText("<br>该通知包含以下" + str(len(event['commonAttachmentList'])) + "个附件: <br>", 'html'))
+            for attachment in event['commonAttachmentList']:
+                msg.attach(MIMEText(attachment['fileName'] + "<br>", 'html'))
+        else:
+            msg.attach(MIMEText("<br>该通知没有附件。", 'html'))
+        
+        # 结尾
+        msg.attach(MIMEText("<br>请您及时查看，谢谢！<br>琪露诺bot", 'html'))
+
+        print(msg)
+        
+        # 发送邮件
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.sendmail(SMTP_USERNAME, to[U_EMAIL], msg.as_string())
+            print("邮件发送成功！")
+            time.sleep(5) # 不要频繁请求
+
 
 # 处理活动，写入数据库
 # events 是一个列表，每个元素是一个活动
@@ -253,6 +307,10 @@ def processEvents(session, events):
             event = findCommonMsgPublishById(session, event['id'])
             sqlInsertNotification(event)
             print("插入通知成功！")
+
+            # 发送邮件
+            sendNotiEmail(event)
+
             time.sleep(2) # 不要频繁请求
 
             # 处理附件
@@ -261,9 +319,9 @@ def processEvents(session, events):
             if (event['commonAttachmentList'] != None):
                 for attachment in event['commonAttachmentList']:
                     localFilePath = handleDownloadfile(session, attachment)
-                    SqlInsertAttachment(attachment, localFilePath)
+                    sqlInsertAttachment(attachment, localFilePath)
                     print("插入附件成功！")
-                    SQlInsertRelation(event['id'], attachment['id'])
+                    sqlInsertRelation(event['id'], attachment['id'])
                     print("插入关系成功！")
                     time.sleep(5) # 不要频繁请求
 
@@ -321,8 +379,8 @@ def processEvents(session, events):
 
 # ----- 生产环境 ----- #
 
-session = login()
+# session = login()
 
-events = findMyCommonMsgPublish(session)
+# events = findMyCommonMsgPublish(session)
 
-processEvents(session, events)
+# processEvents(session, events)
