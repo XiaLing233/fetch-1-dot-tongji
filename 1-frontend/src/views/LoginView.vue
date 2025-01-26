@@ -143,15 +143,17 @@ export default {
                         }
                     })
                     .then(response => {
-                        console.log(response)
+                        // console.log(response)
                         this.$store.commit('login')
-                        console.log("email: " + this.form.xl_email)
-                        this.getUserInfo()
+                        // console.log("email: " + this.form.xl_email)
+                        return this.getUserInfo()
+                    })
+                    .then(() => {
+                        this.$router.push('/')
                         ElMessage({
                             message: '登录成功',
                             type: 'success'
                         })
-                        this.$router.push('/')
                     })
                     .catch(error => {
                         console.log(error)

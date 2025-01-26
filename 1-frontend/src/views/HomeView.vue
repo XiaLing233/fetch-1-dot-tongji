@@ -47,6 +47,7 @@
             <el-table-column
                 prop="status"
                 label="状态"
+                column-key="statusColumn"
                 :filters="[
                     { text: '置顶', value: '置顶' },
                     { text: '发布中', value: '发布中' },
@@ -184,7 +185,7 @@
             })
             .then(res => {
                 this.isLoading = false
-                console.log(res)
+                // console.log(res)
                 this.tableData = res.data.data
                 // 把时间戳转换为日期格式
                 this.tableData.forEach(row => {
@@ -193,7 +194,7 @@
                 })
                 this.pagi.total = this.tableData.length
                 this.tempTableData = this.tableData
-                console.log(this.tableData)
+                // console.log(this.tableData)
             })
             .catch(err => {
                 this.isLoading = false
@@ -310,7 +311,7 @@
             // 当表格的筛选条件发生变化的时候会触发该事件，参数的值是一个对象，对象的 key 是 column 的 columnKey，对应的 value 为用户选择的筛选条件的数组。
             handleFilter(filters) {
                 console.log(filters)
-                const status = filters['el-table_1_column_4']
+                const status = filters['statusColumn'] // 需要在 el-table-column 中设置 column-key 属性才可以，不然传入的是个动态的值，每次刷新可能会变，需要写一个静态的值才好
                 if (status.length === 0) {
                     this.tempTableData = this.tableData
                 }

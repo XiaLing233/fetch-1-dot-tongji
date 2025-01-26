@@ -136,7 +136,7 @@ export default {
                     }
                 })
                     .then(response => {
-                        console.log(response)
+                        // console.log(response)
                         this.$store.commit('toggleNoti')
                         ElMessage({
                             message: '切换成功',
@@ -182,7 +182,7 @@ export default {
                         }
                     })
                         .then(response => {
-                            console.log(response)
+                            // console.log(response)
                             ElMessage({
                                 message: '修改成功',
                                 grouping: true,
@@ -201,7 +201,29 @@ export default {
                     return false
                 }
             })
-        }
+        },
+        getUserInfo() {
+            axios({
+                method: 'post',
+                url: '/api/getUserInfo',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                },
+                data: {
+                    xl_email: this.$store.state.userInfo.xl_email // 这里不用再加 @tongji.edu.cn 了
+                }
+            })
+            .then(response => {
+                    this.$store.commit('setUserInfo', response.data.data)
+            })
+            .catch(error => {
+                console.log(error)
+            })
+        },
+    },
+    created() {
+        this.getUserInfo()
     }
 }
 </script>

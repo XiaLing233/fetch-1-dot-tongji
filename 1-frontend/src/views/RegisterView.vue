@@ -166,14 +166,16 @@ export default {
                         }
                     })
                     .then(response => { 
-                        console.log(response)
+                        // console.log(response)
                         this.$store.commit('login')
-                        this.getUserInfo()
+                        return this.getUserInfo()
+                    })
+                    .then(() => {
+                        this.$router.push('/')
                         ElMessage({
                             message: '注册成功',
                             type: 'success'
                         })
-                        this.$router.push('/')
                     })
                     .catch(error => {
                         console.log(error)
@@ -217,7 +219,7 @@ export default {
                         }
                     })
                     .then(response => {
-                        console.log(response)
+                        // console.log(response)
                         this.emailCounter = 60
                         const timer = setInterval(() => {
                             this.emailCounter--

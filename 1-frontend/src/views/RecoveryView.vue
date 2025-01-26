@@ -167,15 +167,16 @@ export default {
                         }
                     })
                     .then(response => { 
-                        console.log(response)
+                        // console.log(response)
                         this.$store.commit('login')
-                        console.log("12345")
-                        this.getUserInfo()
+                        return this.getUserInfo()
+                    })
+                    .then(() => {
+                        this.$router.push('/')
                         ElMessage({
                             message: '找回密码成功',
                             type: 'success'
                         })
-                        this.$router.push('/')
                     })
                     .catch(error => {
                         console.log(error)
@@ -223,7 +224,7 @@ export default {
                         }
                     })
                     .then(response => {
-                        console.log(response)
+                        // console.log(response)
                         this.emailCounter = 60
                         const timer = setInterval(() => {
                             this.emailCounter--
@@ -249,8 +250,8 @@ export default {
             axios.get('/api/getBackgroundImg')
             .then(response => {
                 this.backgroundPic = response.data.data
-                console.log(response)
-                console.log(this.backgroundPic)
+                // console.log(response)
+                // console.log(this.backgroundPic)
             })
             .catch(error => {
                 console.log(error)

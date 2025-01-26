@@ -13,8 +13,8 @@ import { RouterView } from 'vue-router';
                 <el-text type="info">
                     {{ this.$store.state.userInfo.xl_login_log.length > 1 ? '上次登录：' : '首次登录' }}
                 </el-text>
-                <el-text v-if="this.$store.state.userInfo.xl_login_log.length > 1">
-                      {{ this.$store.state.userInfo.xl_login_log[1]['login_at'] }}
+                <el-text>
+                      {{ this.$store.state.userInfo.xl_login_log.length > 1 ? this.$store.state.userInfo.xl_login_log[1]['login_at'] : '' }}
                 </el-text>
               </div>
             <div class="edu-item">
@@ -145,7 +145,7 @@ import { RouterView } from 'vue-router';
           },
         })
         .then(response => {
-          console.log(response)
+          // console.log(response)
         })
         .catch(error => {
           console.log(error)
@@ -154,7 +154,7 @@ import { RouterView } from 'vue-router';
       handleMenu()
       {
         this.openMenu = !this.openMenu
-        console.log(this.openMenu)
+        // console.log(this.openMenu)
       }
     },
 }

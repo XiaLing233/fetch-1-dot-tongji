@@ -28,7 +28,7 @@ const store = createStore({
             localStorage.clear()
         },
         setUserInfo(state, userInfo) {
-            console.log('setUserInfo', userInfo)
+            // console.log('setUserInfo', userInfo)
             state.userInfo = userInfo
             localStorage.setItem('userInfo', JSON.stringify(userInfo))
         },
