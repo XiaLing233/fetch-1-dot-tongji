@@ -48,7 +48,10 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(hours=1) # token 过
 app.config['JWT_TOKEN_LOCATION'] = ['cookies'] # token 位置
 app.config['JWT_ACCESS_COOKIE_NAME'] = 'xl_token' # token 名称
 # 开发环境
-app.config['JWT_COOKIE_SECURE'] = False
+# app.config['JWT_COOKIE_SECURE'] = False
+# 生产环境
+app.config['JWT_COOKIE_SECURE'] = True
+app.config['JWT_COOKIE_SAMESITE'] = 'Strict'
 jwt = JWTManager(app)
 
 # 设置邮件
@@ -70,6 +73,9 @@ app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
 app.config['SECRET_KEY'] = SESSION_SECRET_KEY
 app.config['SESSION_REDIS'] = redis.Redis(host='localhost', port=6379, db=0)
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
+app.config['SESSION_COOKIE_NAME'] = '__Secure-xl_session'
 
 Session(app)
 
@@ -356,8 +362,6 @@ def register():
         }), 400
 
     # 检查验证码
-    # print("session中的验证码：", session.get('verification_code'))
-    # print("传入的验证码：", xl_veri_code)
     if session.get('verification_code') != xl_veri_code:
         return jsonify({
             'code': 400,
@@ -397,7 +401,6 @@ def register():
     set_access_cookies(response, access_token)
 
     # 设置 cookie，不在返回体中设置
-    # response.set_cookie('xl_token', access_token, httponly=True) #, samesite='Strict') #, secure=True)
     return response, 200
 
 

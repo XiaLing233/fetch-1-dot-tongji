@@ -283,6 +283,10 @@ e.encrypt = function(e) {
 
 在本地文件夹存储文件。参见 `fetchNewEvents.py`。
 
+#### 通知
+
+每当获取到新的信息，则会遍历数据库中接收通知的用户邮箱，发送邮件提醒。
+
 ### 用户相关
 
 身份验证采用了 `Flask-JWT-Extended`，把凭证存储在 `Cookie` 中。
