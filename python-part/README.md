@@ -86,6 +86,8 @@ smtp_server =
 smtp_port = 
 smtp_username = 
 smtp_password = 
+smtp_username_batch = 
+smtp_password_batch = 
 
 [Session]
 secret_key = 
@@ -281,7 +283,7 @@ Werkzeug | 3.1.3 | |
 }
 ```
 
-### `/api/findMyCommonMsgPublish`
+### `/api/findMyCommonMsgPublish`（本方法不需要验证 token）
 
 `GET`
 
