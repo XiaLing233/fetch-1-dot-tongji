@@ -199,11 +199,6 @@
             .catch(err => {
                 this.isLoading = false
                 console.log(err)
-                ElMessage({
-                    message: "未登录",
-                    type: 'error'
-                })
-                this.$store.commit('logout')
             })
         },
         methods:
@@ -229,6 +224,7 @@
                             type: 'warning',
                             grouping: true
                         })
+                        this.$store.commit('logout')
                         return
                     }
                     axios({
@@ -254,9 +250,13 @@
                             message: err.response.data.msg,
                             type: 'error'
                         })
-                        // 一般出现这种情况，是因为 token 过期了
-                        this.$store.commit('logout')
-                        this.$router.push('/login')
+                        
+                        // 如果返回的状态码是 401，说明 token 过期了，需要重新登录
+                        if (err.response.status === 401) {
+                            this.$store.commit('logout')
+                            this.$router.push('/login')
+                        }
+
                         this.isLoading = false
                     })
                 }
@@ -300,6 +300,11 @@
                 })
                 .catch(err => {
                     console.log(err)
+                    // 如果返回的状态码是 401，说明 token 过期了，需要重新登录
+                    if (err.response.status === 401) {
+                        this.$store.commit('logout')
+                        this.$router.push('/login')
+                    }
                 })       
                 },
             handleSizeChange(val) {

@@ -165,10 +165,12 @@ export default {
                             xl_veri_code: this.form.xl_veri_code
                         }
                     })
-                    .then(response => { 
+                    .then(() => {
+                        return this.getUserInfo()
+                    })
+                    .then(() => { 
                         // console.log(response)
                         this.$store.commit('login')
-                        return this.getUserInfo()
                     })
                     .then(() => {
                         this.$router.push('/')

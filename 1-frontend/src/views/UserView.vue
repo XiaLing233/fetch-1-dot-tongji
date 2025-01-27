@@ -122,6 +122,7 @@ export default {
                     type: 'warning',
                     grouping: true
                 })
+                this.$store.commit('logout')
                 return
                 }
                 axios({
@@ -147,11 +148,23 @@ export default {
                     })
                     .catch(error => {
                         console.log(error)
-                        ElMessage({
-                            message: '网络错误，请稍后再试',
+                        // 如果返回的状态码是 401，说明 token 过期了，需要重新登录
+                        if (err.response.status === 401) {
+                            this.$store.commit('logout')
+                            this.$router.push('/login')
+                            ElMessage({
+                            message: '登录已过期',
                             grouping: true,
                             type: 'error'
                         })
+                        }
+                        else{
+                            ElMessage({
+                                message: '网络错误，请稍后再试',
+                                grouping: true,
+                                type: 'error'
+                            })
+                        }
                         resolve(false)
                     })
             })
@@ -168,6 +181,7 @@ export default {
                             type: 'warning',
                             grouping: true
                         })
+                        this.$store.commit('logout')
                         return
                     }
                     axios({
@@ -191,11 +205,22 @@ export default {
                         })
                         .catch(error => {
                             console.log(error)
-                            ElMessage({
-                                message: '网络错误，请稍后再试',
+                            if (err.response.status === 401) {
+                                this.$store.commit('logout')
+                                this.$router.push('/login')
+                                ElMessage({
+                                message: '登录已过期',
                                 grouping: true,
                                 type: 'error'
                             })
+                            }
+                            else{
+                                ElMessage({
+                                    message: '网络错误，请稍后再试',
+                                    grouping: true,
+                                    type: 'error'
+                                })
+                            }
                         })
                 } else {
                     return false
@@ -203,6 +228,17 @@ export default {
             })
         },
         getUserInfo() {
+            if (!document.cookie) {
+                this.isLoading = false
+                ElMessage({
+                    title: '提示',
+                    message: '您还未登录，请先登录',
+                    type: 'warning',
+                    grouping: true
+                })
+                this.$store.commit('logout')
+                return
+            }
             axios({
                 method: 'post',
                 url: '/api/getUserInfo',
@@ -219,6 +255,22 @@ export default {
             })
             .catch(error => {
                 console.log(error)
+                if (err.response.status === 401) {
+                    this.$store.commit('logout')
+                    this.$router.push('/login')
+                    ElMessage({
+                    message: '登录已过期',
+                    grouping: true,
+                    type: 'error'
+                })
+                }
+                else{
+                    ElMessage({
+                        message: '网络错误，请稍后再试',
+                        grouping: true,
+                        type: 'error'
+                    })
+                }
             })
         },
     },

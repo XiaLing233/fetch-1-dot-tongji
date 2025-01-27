@@ -142,11 +142,12 @@ export default {
                             xl_password: passwordEncrypt(this.form.xl_password)
                         }
                     })
-                    .then(response => {
+                    .then(() => {
+                        return this.getUserInfo()
+                    })
+                    .then(() => { 
                         // console.log(response)
                         this.$store.commit('login')
-                        // console.log("email: " + this.form.xl_email)
-                        return this.getUserInfo()
                     })
                     .then(() => {
                         this.$router.push('/')
