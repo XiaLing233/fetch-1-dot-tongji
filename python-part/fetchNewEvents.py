@@ -4,6 +4,7 @@
 import requests # 用于发送 HTTP 请求
 from packages import myEncrypt # 用于加密密码
 import time # 生成时间戳
+import datetime # 生成时间
 import configparser # 读取配置文件
 from urllib.parse import urlencode # 用于编码请求体
 from packages.tjSql import sqlInsertNotification, sqlHaveRecorded, sqlInsertAttachment, sqlInsertRelation, sqlGetAllReceiveNotiUser  # 用于写入数据库
@@ -14,6 +15,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
 import smtplib
+
 
 # 数据库
 
@@ -296,7 +298,10 @@ def sendNotiEmail(event):
 # events 是一个列表，每个元素是一个活动
 def processEvents(session, events):
     # 测试
+    print("\n\n\n")
+    print("现在是：", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print("开始处理活动！")
+    print("\n\n\n")
     for event in events:
         print("处理活动：", event['id'])
         print("活动标题：", event['title'])
@@ -356,6 +361,10 @@ def processEvents(session, events):
     else:
         print("退出登录失败！")
         print("状态码：", response.status_code)
+
+    print("现在是：", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    print("处理活动结束！")
+    print("\n\n\n")
             
 
 
