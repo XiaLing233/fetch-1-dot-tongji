@@ -149,7 +149,7 @@ export default {
                     .catch(error => {
                         console.log(error)
                         // 如果返回的状态码是 401，说明 token 过期了，需要重新登录
-                        if (err.response.status === 401) {
+                        if (error.response.status === 401) {
                             this.$store.commit('logout')
                             this.$router.push('/login')
                             ElMessage({
@@ -182,6 +182,7 @@ export default {
                             grouping: true
                         })
                         this.$store.commit('logout')
+                        this.$router.push('/login')
                         return
                     }
                     axios({
@@ -205,7 +206,7 @@ export default {
                         })
                         .catch(error => {
                             console.log(error)
-                            if (err.response.status === 401) {
+                            if (error.response.status === 401) {
                                 this.$store.commit('logout')
                                 this.$router.push('/login')
                                 ElMessage({
@@ -237,6 +238,7 @@ export default {
                     grouping: true
                 })
                 this.$store.commit('logout')
+                this.$router.push('/login')
                 return
             }
             axios({
@@ -255,7 +257,7 @@ export default {
             })
             .catch(error => {
                 console.log(error)
-                if (err.response.status === 401) {
+                if (error.response.status === 401) {
                     this.$store.commit('logout')
                     this.$router.push('/login')
                     ElMessage({

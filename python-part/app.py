@@ -21,6 +21,10 @@ import base64 # base64 编码
 
 # 不需要链接数据库，因为由 tjSql 完成
 
+# ----- 配置 ----- #
+
+PRODUCTION = True # 是否为生产环境
+
 # 读取配置文件
 
 CONFIG = configparser.ConfigParser()
@@ -44,14 +48,17 @@ CORS(app, supports_credentials=True) # 支持跨域
 
 # 设置 JWT
 app.config['JWT_SECRET_KEY'] = SECRET_KEY
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(hours=1) # token 过期时间
 app.config['JWT_TOKEN_LOCATION'] = ['cookies'] # token 位置
 app.config['JWT_ACCESS_COOKIE_NAME'] = 'xl_token' # token 名称
-# 开发环境
-# app.config['JWT_COOKIE_SECURE'] = False
-# 生产环境
-app.config['JWT_COOKIE_SECURE'] = True
-app.config['JWT_COOKIE_SAMESITE'] = 'Strict'
+if PRODUCTION:
+    app.config['JWT_COOKIE_SECURE'] = True
+    app.config['JWT_COOKIE_SAMESITE'] = 'Strict'
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(hours=1) # token 过期时间
+
+else:
+    app.config['JWT_COOKIE_SECURE'] = False
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(seconds=10) # token 过期时间
+
 jwt = JWTManager(app)
 
 # 设置邮件
@@ -73,9 +80,10 @@ app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
 app.config['SECRET_KEY'] = SESSION_SECRET_KEY
 app.config['SESSION_REDIS'] = redis.Redis(host='localhost', port=6379, db=0)
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
-app.config['SESSION_COOKIE_NAME'] = '__Secure-xl_session'
+if PRODUCTION:
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
+    app.config['SESSION_COOKIE_NAME'] = '__Secure-xl_session'
 
 Session(app)
 
@@ -770,3 +778,12 @@ def logout():
     unset_access_cookies(response)
 
     return response, 200
+
+# 测试凭证是否过期，一个简单的 GET 请求
+@app.route('/api/checkToken', methods=['GET'])
+@jwt_required()
+def checkToken():
+    return jsonify({
+        'code': 200,
+        'msg': '成功'
+    }), 200

@@ -151,62 +151,58 @@ export default {
         }
     },
     methods: {
-        register() {
+        async register() {
             const formEl = this.$refs.ruleFormRef
             if (!formEl) return
-            formEl.validate((valid) => {
-                if (valid) {
-                    axios({
-                        method: 'post',
-                        url: '/api/register',
-                        data: {
-                            xl_email: this.form.xl_email + '@tongji.edu.cn',
-                            xl_password: passwordEncrypt(this.form.xl_password),
-                            xl_veri_code: this.form.xl_veri_code
-                        }
-                    })
-                    .then(() => {
-                        return this.getUserInfo()
-                    })
-                    .then(() => { 
-                        // console.log(response)
-                        this.$store.commit('login')
-                    })
-                    .then(() => {
-                        this.$router.push('/')
-                        ElMessage({
-                            message: '注册成功',
-                            type: 'success'
-                        })
-                    })
-                    .catch(error => {
-                        console.log(error)
-                        ElMessage({
-                            message: error.response.data.msg,
-                            type: 'error'
-                        })
-                    })
-                }
-            })
-        },
-        getUserInfo() {
-            axios({
-                method: 'post',
-                url: '/api/getUserInfo',
-                credentials: 'same-origin',
-                headers: {
-                    'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
-                },
-                data: {
-                    xl_email: this.form.xl_email + '@tongji.edu.cn'
-                }
-            })
-            .then(response => {
-                    this.$store.commit('setUserInfo', response.data.data)
-            })
-            .catch(error => {
+
+            const valid = await formEl.validate()
+            if (!valid) return
+
+            try {
+                await axios({
+                    method: 'post',
+                    url: '/api/register',
+                    data: {
+                        xl_email: this.form.xl_email + '@tongji.edu.cn',
+                        xl_password: passwordEncrypt(this.form.xl_password),
+                        xl_veri_code: this.form.xl_veri_code
+                    }
+                })
+
+                await this.getUserInfo()
+                this.$store.commit('login')
+                ElMessage({
+                    message: '注册成功',
+                    type: 'success'
+                })
+                this.$router.push('/')
+            } catch (error) {
                 console.log(error)
-            })
+                ElMessage({
+                    message: error.response.data.msg,
+                    type: 'error'
+                })
+            }
+        },
+        async getUserInfo() {
+            try {
+                const response = await axios({
+                    method: 'post',
+                    url: '/api/getUserInfo',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                    },
+                    data: {
+                        xl_email: this.form.xl_email + '@tongji.edu.cn'
+                    }
+                })
+                this.$store.commit('setUserInfo', response.data.data)
+                console.log("setUserInfo")
+            } catch (error) {
+                console.log(error)
+                throw error
+            }
         },
         sendVerificationEmail() {
             const formEl = this.$refs.ruleFormRef

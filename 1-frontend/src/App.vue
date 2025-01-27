@@ -67,6 +67,19 @@ import { RouterView } from 'vue-router';
         <RouterView />
       </el-container>
     </el-container>
+
+    <!-- 提示区 -->
+    <el-dialog
+        v-model="openAlertDialog"
+        title="提示"
+        width="500"
+    >
+        <p>登录状态已过期，请重新登录</p>
+        <template #footer>
+            <el-button @click="openAlertDialog = false">取消</el-button>
+            <el-button type="primary" @click="openAlertDialog = false">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <style scoped>
@@ -113,18 +126,22 @@ import { RouterView } from 'vue-router';
   import { Menu } from '@element-plus/icons-vue';
   import axios from 'axios';
   import malePNG from '@/assets/male.png';
+  import { ElMessage } from 'element-plus';
 
   export default {
     data() {
       return {
         openMenu: false,
-        malePNG
+        malePNG,
+        openAlertDialog: false,
       }
     },
     created() {
         if (window.innerWidth < 768) {
             this.$store.commit('setIsMobile', true)
         }
+
+        this.checkTokenTimely()
     },
     components: {
       ArrowDown,
@@ -133,6 +150,18 @@ import { RouterView } from 'vue-router';
     methods:
     {
       logout() {
+      if (!document.cookie) {
+              this.isLoading = false
+              ElMessage({
+                  title: '提示',
+                  message: '您还未登录，请先登录',
+                  type: 'warning',
+                  grouping: true
+              })
+              this.$store.commit('logout')
+              this.$router.push('/login')
+              return
+          }
         // 清空 vuex 中的所有数据
         this.$store.commit('logout')
         this.$router.push('/login')
@@ -155,7 +184,45 @@ import { RouterView } from 'vue-router';
       {
         this.openMenu = !this.openMenu
         // console.log(this.openMenu)
-      }
+      },
+      // 定期向后端请求，测试 token 是否过期
+      checkToken()
+      {
+        if (this.$store.state.isLoggedin) {
+          axios({
+            method: 'get',
+            url: '/api/checkToken',
+            headers: {
+              'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+            },
+          })
+          .then(response => {
+            // console.log(response)
+          })
+          .catch(error => {
+            console.log(error)
+            if (error.response.status === 401) {
+              this.openAlertDialog = true
+              this.$store.commit('logout')
+              this.$router.push('/login')
+          }
+          else {
+            ElMessage({
+              title: '提示',
+              message: '未知错误，请联系管理员',
+              type: 'error',
+              grouping: true
+            })
+          }
+        })
+        }
+      },
+      checkTokenTimely()
+      {
+        setInterval(() => {
+          this.checkToken()
+        }, 10000)
+      },
     },
 }
 </script>
