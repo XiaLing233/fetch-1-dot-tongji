@@ -355,6 +355,11 @@ def sqlFindMyCommonMsgPublishById(notification_id):
         print("查询到的附件信息是：", attachment_info)
         attachment_list.append(attachment_info)
 
+    if result[0][5] != None:
+        invalid_top_time = result[0][5].strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        invalid_top_time = None
+
     # 把通知和附件信息合并
     notification_data = {
         f"{ N_ID }": result[0][0],
@@ -362,7 +367,7 @@ def sqlFindMyCommonMsgPublishById(notification_id):
         f"{ N_CONTENT }": result[0][2],
         f"{ N_START_TIME }": result[0][3].strftime("%Y-%m-%d %H:%M:%S"),
         f"{ N_END_TIME }": result[0][4].strftime("%Y-%m-%d %H:%M:%S"),
-        f"{ N_INVALID_TOP_TIME }": result[0][5].strftime("%Y-%m-%d %H:%M:%S"),
+        f"{ N_INVALID_TOP_TIME }": invalid_top_time,
         f"{ N_CREATE_ID }": result[0][6],
         f"{ N_CREATE_USER }": result[0][7],
         f"{ N_CREATE_TIME }": result[0][8].strftime("%Y-%m-%d %H:%M:%S"),

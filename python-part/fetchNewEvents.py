@@ -3,8 +3,8 @@
 
 # vvvvv 开关 vvvvv #
 
-ENABLE_PROXY = False # 是否启用代理
-SEND_EMAIL = False # 是否发送邮件
+ENABLE_PROXY = True # 是否启用代理
+SEND_EMAIL = True # 是否发送邮件
 
 # ^^^^^ 开关 ^^^^^ #
 

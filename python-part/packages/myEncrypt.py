@@ -1,6 +1,6 @@
 # 加密部分
 
-ENABLE_PROXY = False # 是否启用代理
+ENABLE_PROXY = True # 是否启用代理
 
 import configparser # 读取配置文件
 import requests # 网络请求
