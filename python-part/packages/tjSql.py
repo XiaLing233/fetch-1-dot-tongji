@@ -222,6 +222,7 @@ def sqlFindMyCommonMsgPublish():
         f"{N_INVALID_TOP_TIME}, {N_CREATE_ID}, {N_CREATE_USER}, "
         f"{N_CREATE_TIME}, {N_PUBLISH_TIME} FROM {N_TABLE_NAME} "
         f"WHERE {N_INVALID_TOP_TIME} <= %s "
+        f"OR {N_INVALID_TOP_TIME} IS NULL "
         f"ORDER BY {N_PUBLISH_TIME} DESC" # 按照发布时间倒序排列，最新的在前
     )
     
@@ -238,16 +239,18 @@ def sqlFindMyCommonMsgPublish():
         item[N_END_TIME] = item[N_END_TIME].strftime("%Y-%m-%d %H:%M:%S")
         item[N_CREATE_TIME] = item[N_CREATE_TIME].strftime("%Y-%m-%d %H:%M:%S")
         item[N_PUBLISH_TIME] = item[N_PUBLISH_TIME].strftime("%Y-%m-%d %H:%M:%S")
-        item[N_INVALID_TOP_TIME] = item[N_INVALID_TOP_TIME].strftime("%Y-%m-%d %H:%M:%S")
+        if item[N_INVALID_TOP_TIME] != None:
+            item[N_INVALID_TOP_TIME] = item[N_INVALID_TOP_TIME].strftime("%Y-%m-%d %H:%M:%S")
 
     # 增加一列表示状态
     for item in result:
-        if item[N_INVALID_TOP_TIME] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
-            item['status'] = "置顶"
-        elif item[N_END_TIME] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
+        if item[N_END_TIME] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
             item['status'] = "发布中"
         else:
             item['status'] = "已过期"
+        
+        if item[N_INVALID_TOP_TIME] != None and item[N_INVALID_TOP_TIME] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
+            item['status'] = "置顶"
     
     print("查询到的通知数量是：", len(result))
     # print("查询到的通知是：", result)

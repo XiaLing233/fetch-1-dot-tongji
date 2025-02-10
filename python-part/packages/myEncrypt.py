@@ -1,5 +1,7 @@
 # 加密部分
 
+ENABLE_PROXY = False # 是否启用代理
+
 import configparser # 读取配置文件
 import requests # 网络请求
 from Crypto.PublicKey import RSA # RSA 加密
@@ -37,7 +39,10 @@ PROXIES = {
 def getRSAPublicKey(js_url):
     # js_url = RSA_URL
 
-    response = requests.get(js_url, proxies=PROXIES, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
+    if ENABLE_PROXY:
+        response = requests.get(js_url, proxies=PROXIES, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
+    else:
+        response = requests.get(js_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
 
     # 从 js 文件中提取公钥
     content = response.text
@@ -78,7 +83,10 @@ def encryptPassword(js_url):
 def getAESKeyAndIV(js_url):
     # js_url = AES_URL
     
-    response = requests.get(js_url, proxies=PROXIES, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
+    if ENABLE_PROXY:
+        response = requests.get(js_url, proxies=PROXIES, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'}) 
+    else:
+        response = requests.get(js_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
 
     # 从 js 文件中提取密钥和 IV
     # 因为这个文件是混淆过的，所以用 , 来分行

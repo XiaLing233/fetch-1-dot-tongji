@@ -1,6 +1,13 @@
 # 获取 1 系统新发布的活动
 # 并将其存储到本地
 
+# vvvvv 开关 vvvvv #
+
+ENABLE_PROXY = False # 是否启用代理
+SEND_EMAIL = False # 是否发送邮件
+
+# ^^^^^ 开关 ^^^^^ #
+
 import requests # 用于发送 HTTP 请求
 from packages import myEncrypt # 用于加密密码
 import time # 生成时间戳
@@ -24,14 +31,15 @@ CONFIG = configparser.ConfigParser()
 CONFIG.read('config.ini')
 
 # 代理
-HTTP_PROXY = CONFIG['Proxy']['http']
-HTTPS_PROXY = CONFIG['Proxy']['https']
+if ENABLE_PROXY:
+    HTTP_PROXY = CONFIG['Proxy']['http']
+    HTTPS_PROXY = CONFIG['Proxy']['https']
 
-# 配置 SOCKS5 代理
-PROXIES = {
-    'http': HTTP_PROXY,
-    'https': HTTPS_PROXY
-}
+    # 配置 SOCKS5 代理
+    PROXIES = {
+        'http': HTTP_PROXY,
+        'https': HTTPS_PROXY
+    }
 
 # 存储文件的路径
 STORE_PATH = CONFIG['Storage']['attachment_path'] # 末尾没有斜杠
@@ -73,8 +81,10 @@ def login():
 
     session = requests.Session()
     session.headers.update(headers)
-
-    response = session.get(entry_url, proxies=PROXIES)
+    if ENABLE_PROXY:
+        response = session.get(entry_url, proxies=PROXIES)
+    else:
+        response = session.get(entry_url)
 
     # 获取 authnLcKey
     authnLcKey = response.url.split('=')[-1] # 从 URL 中提取 authnLcKey，从后往前找到第一个等号，取等号后的部分
@@ -110,14 +120,19 @@ def login():
             'Content-Type': 'application/x-www-form-urlencoded', # 设置 Content-Type
         }
     )
-
-    response = session.post(chain_url, data=login_data, allow_redirects=False, proxies=PROXIES)
+    if ENABLE_PROXY:
+        response = session.post(chain_url, data=login_data, allow_redirects=False, proxies=PROXIES)
+    else:
+        response = session.post(chain_url, data=login_data, allow_redirects=False)
 
     # ----- 第三步：AuthnEngine ----- #
 
     auth_url = "https://iam.tongji.edu.cn/idp/AuthnEngine?currentAuth=urn_oasis_names_tc_SAML_2.0_ac_classes_BAMUsernamePassword&authnLcKey=" + authnLcKey + "&entityId=SYS20230001"
 
-    response = session.post(auth_url, data=login_data, allow_redirects=False, proxies=PROXIES)
+    if ENABLE_PROXY:
+        response = session.post(auth_url, data=login_data, allow_redirects=False, proxies=PROXIES)
+    else:
+        response = session.post(auth_url, data=login_data, allow_redirects=False)
 
     # ----- 第四步：SSO 登录 ----- #
 
@@ -134,25 +149,37 @@ def login():
     session.headers.clear() # 记得清空 headers，因为有 Content-Type 等不需要的字段
     session.headers.update(sso_headers)
 
-    response = session.get(sso_url, allow_redirects=False, proxies=PROXIES)
+    if ENABLE_PROXY:
+        response = session.get(sso_url, allow_redirects=False, proxies=PROXIES)
+    else:
+        response = session.get(sso_url, allow_redirects=False)
 
     # ----- 第五步：LoginIn code & state----- #
 
     loginIn_url = response.headers['Location']
 
-    response = session.get(loginIn_url, allow_redirects=False, proxies=PROXIES)
+    if ENABLE_PROXY:
+        response = session.get(loginIn_url, allow_redirects=False, proxies=PROXIES)
+    else:
+        response = session.get(loginIn_url, allow_redirects=False)
 
     # ----- 第六步：ssologin token----- #
 
     ssologin_url = response.headers['Location']
 
-    response = session.get(ssologin_url, allow_redirects=False, proxies=PROXIES)
+    if ENABLE_PROXY:
+        response = session.get(ssologin_url, allow_redirects=False, proxies=PROXIES)
+    else:
+        response = session.get(ssologin_url, allow_redirects=False)
 
     # ----- 第七步：转 HTTPS ----- #
 
     https_url = response.headers['Location']
 
-    response = session.get(https_url, allow_redirects=False, proxies=PROXIES)
+    if ENABLE_PROXY:
+        response = session.get(https_url, allow_redirects=False, proxies=PROXIES)
+    else:
+        response = session.get(https_url, allow_redirects=False)
 
     global AES_URL
 
@@ -178,7 +205,10 @@ def login():
 
     # 发送请求
 
-    response = session.post(login_url, data=login_req_body, proxies=PROXIES)
+    if ENABLE_PROXY:
+        response = session.post(login_url, data=login_req_body, proxies=PROXIES)
+    else:
+        response = session.post(login_url, data=login_req_body)
 
     # 打印结果
     if response.status_code == 200:
@@ -206,7 +236,10 @@ def findMyCommonMsgPublish(session):
     # 发送请求
     msg_url = "https://1.tongji.edu.cn/api/commonservice/commonMsgPublish/findMyCommonMsgPublish"
 
-    response = session.post(msg_url, data=req_body, proxies=PROXIES)
+    if ENABLE_PROXY:
+        response = session.post(msg_url, data=req_body, proxies=PROXIES)
+    else:
+        response = session.post(msg_url, data=req_body)
 
     if (response.status_code == 200):
         print("请求成功！")
@@ -224,7 +257,10 @@ def findCommonMsgPublishById(session, id):
     # * 1000 是为了转换为毫秒级时间戳
     req_url = f"https://1.tongji.edu.cn/api/commonservice/commonMsgPublish/findCommonMsgPublishById?id={ id }&t={ int(time.time() * 1000) }"
 
-    response = session.get(req_url, proxies=PROXIES)
+    if ENABLE_PROXY:
+        response = session.get(req_url, proxies=PROXIES)
+    else:
+        response = session.get(req_url)
 
     if (response.status_code == 200):
         print("请求成功！")
@@ -245,7 +281,10 @@ def handleDownloadfile(session, attachment):
     download_url += remotefilePath
 
     # 下载附件
-    response = session.get(download_url, proxies=PROXIES)
+    if ENABLE_PROXY:
+        response = session.get(download_url, proxies=PROXIES)
+    else:
+        response = session.get(download_url)
 
     # 保存到本地
     localFilePath = STORE_PATH + "/" + attachment['fileName'] # 要和返回的 key 对应，不要乱起名
@@ -314,7 +353,11 @@ def processEvents(session, events):
             print("插入通知成功！")
 
             # 发送邮件
-            sendNotiEmail(event)
+            if SEND_EMAIL:
+                sendNotiEmail(event)
+            else:
+                time.sleep(10) # 模拟发送邮件
+                print("邮件发送成功！(模拟)")
 
             time.sleep(2) # 不要频繁请求
 
@@ -346,15 +389,16 @@ def processEvents(session, events):
         'Accept': 'application/json, text/plain, */*',
         'Origin': 'https://1.tongji.edu.cn/',        
         'Referer': 'https://1.tongji.edu.cn/workbench',        
-        "Content-Type": "application/json",
-        "Content-Length": str(len(logout_data),),
     }
 
     session.headers.update(headers)
 
     print(headers)
 
-    response = session.post("https://1.tongji.edu.cn/api/sessionservice/session/logout", proxies=PROXIES, data=logout_data)
+    if ENABLE_PROXY:
+        response = session.post("https://1.tongji.edu.cn/api/sessionservice/session/logout", proxies=PROXIES, json=logout_data)
+    else:
+        response = session.post("https://1.tongji.edu.cn/api/sessionservice/session/logout", json=logout_data)
 
     if (response.status_code == 200):
         print("退出登录成功！")

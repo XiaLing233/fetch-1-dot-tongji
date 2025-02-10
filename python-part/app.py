@@ -19,6 +19,8 @@ import os # 文件操作
 
 import base64 # base64 编码
 
+import logging
+
 # 不需要链接数据库，因为由 tjSql 完成
 
 # ----- 配置 ----- #
@@ -116,8 +118,11 @@ def sendEmailVerification(recEmail, token):
     '''
     
     # 发送邮件
-    mail.send(msg)
-    print("邮件发送成功")
+    try:
+        mail.send(msg)
+        print("邮件发送成功")
+    except Exception as e:
+        print("邮件发送失败：", e)
 
 # 发送找回密码邮件
 def sendEmailFindPassword(recEmail, token):
@@ -142,8 +147,11 @@ def sendEmailFindPassword(recEmail, token):
     '''
     
     # 发送邮件
-    mail.send(msg)
-    print("邮件发送成功")
+    try:
+        mail.send(msg)
+        print("邮件发送成功")
+    except Exception as e:
+        print("邮件发送失败：", e)
 
 # 检查邮箱格式
 def checkEmailFormat(email):

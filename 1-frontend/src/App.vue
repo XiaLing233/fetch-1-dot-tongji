@@ -140,8 +140,7 @@ import { RouterView } from 'vue-router';
         if (window.innerWidth < 768) {
             this.$store.commit('setIsMobile', true)
         }
-
-        this.checkTokenTimely()
+        this.checkTokenTimely() // 定期检查 token 是否过期
     },
     components: {
       ArrowDown,
@@ -219,9 +218,10 @@ import { RouterView } from 'vue-router';
       },
       checkTokenTimely()
       {
+        this.checkToken()
         setInterval(() => {
           this.checkToken()
-        }, 10000)
+        }, 1000 * 60 * 5) // 5 分钟检查一次
       },
     },
 }
