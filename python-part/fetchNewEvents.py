@@ -1,20 +1,13 @@
 # 获取 1 系统新发布的活动
 # 并将其存储到本地
 
-# vvvvv 开关 vvvvv #
-
-ENABLE_PROXY = True # 是否启用代理
-SEND_EMAIL = True # 是否发送邮件
-
-# ^^^^^ 开关 ^^^^^ #
-
 import requests # 用于发送 HTTP 请求
 from packages import myEncrypt # 用于加密密码
 import time # 生成时间戳
 import datetime # 生成时间
 import configparser # 读取配置文件
 from urllib.parse import urlencode # 用于编码请求体
-from packages.tjSql import sqlInsertNotification, sqlHaveRecorded, sqlInsertAttachment, sqlInsertRelation, sqlGetAllReceiveNotiUser  # 用于写入数据库
+from packages.tjSql import sqlInsertNotification, sqlHaveRecorded, sqlInsertAttachment, sqlInsertRelation, sqlGetAllReceiveNotiUser, sqlUpdateNotification, sqlFindAttachmentById # 用于写入数据库
 import json
 
 # 邮件
@@ -29,6 +22,9 @@ import smtplib
 # 读取配置文件
 CONFIG = configparser.ConfigParser()
 CONFIG.read('config.ini')
+
+ENABLE_PROXY = CONFIG['Flag']['use_proxy'] == '1'
+SEND_EMAIL = CONFIG['Flag']['send_email'] == '1'
 
 # 代理
 if ENABLE_PROXY:
@@ -344,8 +340,10 @@ def processEvents(session, events):
     for event in events:
         print("处理活动：", event['id'])
         print("活动标题：", event['title'])
-        if (sqlHaveRecorded(event['id'])): # 如果已经记录过了
-            continue
+        if (sqlHaveRecorded(event['id'])): # 如果已经记录过了，更新
+            event = findCommonMsgPublishById(session, event['id'])
+            sqlUpdateNotification(event)
+            print("更新通知成功！")
         else:
             # 获取活动的具体内容
             event = findCommonMsgPublishById(session, event['id'])
@@ -361,17 +359,24 @@ def processEvents(session, events):
 
             time.sleep(2) # 不要频繁请求
 
-            # 处理附件
-            # 注意，1 系统的 findMyCommonMsgPublish 返回的附件列表永远是 null
-            # 必须 ById 才能获取附件
-            if (event['commonAttachmentList'] != None):
-                for attachment in event['commonAttachmentList']:
+        # 处理附件，不管 if-else
+        # 注意，1 系统的 findMyCommonMsgPublish 返回的附件列表永远是 null
+        # 必须 ById 才能获取附件
+        if (event['commonAttachmentList'] != None):
+            for attachment in event['commonAttachmentList']:
+                try:
+                    # 如果附件已经存在，就不再插入
+                    if sqlFindAttachmentById(attachment["id"]):
+                        print("附件已存在！")
+                        continue
                     localFilePath = handleDownloadfile(session, attachment)
                     sqlInsertAttachment(attachment, localFilePath)
                     print("插入附件成功！")
                     sqlInsertRelation(event['id'], attachment['id'])
                     print("插入关系成功！")
-                    time.sleep(5) # 不要频繁请求
+                except Exception as e:
+                    print("处理附件失败！") # 发现有的通知居然有假的附件！点了链接没反应！不要因为某个附件失败就中断整个程序
+                time.sleep(5) # 不要频繁请求
 
     # 退出登录
     time.sleep(60) # 至少等待 1 分钟再退出登录

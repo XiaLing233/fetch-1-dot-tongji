@@ -1,7 +1,4 @@
 # 加密部分
-
-ENABLE_PROXY = True # 是否启用代理
-
 import configparser # 读取配置文件
 import requests # 网络请求
 from Crypto.PublicKey import RSA # RSA 加密
@@ -14,6 +11,9 @@ from urllib.parse import quote_plus
 
 CONFIG = configparser.ConfigParser()
 CONFIG.read('config.ini')
+
+# 使用代理
+ENABLE_PROXY = CONFIG['Flag']['use_proxy'] == '1'
 
 # 账号密码认证部分
 STU_NO = CONFIG['Account']['sno']

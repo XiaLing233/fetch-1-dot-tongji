@@ -74,6 +74,37 @@ L_USER_ID = CONFIG['Table']['l_user_id']
 L_IP_ADDRESS = CONFIG['Table']['l_ip_address']
 L_LOGIN_AT = CONFIG['Table']['l_login_at']
 
+# ----- 数据更新部分 ----- #
+def sqlUpdateNotification(notification):
+    '''
+    更新所有信息，因为置顶状态等会改变。
+    '''
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    # 插入通知
+    sql = (
+        f" UPDATE {N_TABLE_NAME} SET"
+        f" {N_TITLE} = %s, {N_CONTENT} = %s, {N_START_TIME} = %s, "
+        f" {N_END_TIME} = %s, {N_INVALID_TOP_TIME} = %s, {N_CREATE_ID} = %s, "
+        f" {N_CREATE_USER} = %s, {N_CREATE_TIME} = %s, {N_PUBLISH_TIME} = %s"
+        f" WHERE {N_ID} = %s"
+    )
+
+    print("执行的 SQL 语句是：", sql)
+
+    # print(notification)
+    # input()
+
+    cursor.execute(sql, (notification["title"], notification["content"],
+                        notification["startTime"], notification["endTime"],
+                        notification["invalidTopTime"], notification["createId"],
+                        notification["createUser"], notification["createTime"],
+                        notification["publishTime"], notification["id"]))
+    
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 # ----- 数据插入部分 ----- #
 
