@@ -1,59 +1,6 @@
 <template>
-    <!-- 移动端 -->
-     <div v-if="$store.state.isMobile" style="width: 100%; display: flex; justify-content: center; margin: 0 auto 0 auto">
-        <el-main style="margin: 0; padding: 0; width: 100%">
-        <div 
-            class="background-mobile" 
-            :style="{ 
-                background: 'url(data:image/png;base64,' + backgroundPic + ')', 
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                width: '100%'
-                }">
-        </div>
-            <el-card style="margin: 0; padding: 0 " shadow="never">
-            <template #header>
-                <div style="text-align: center;">
-                    <h2>注册</h2>
-                </div>
-            </template>
-            <el-form
-                ref="ruleFormRef"
-                label-position="top"
-                label-width="auto"
-                :model="form"
-                :rules="rules"
-                style="width: 100%; margin: 0; padding: 0;"
-            >
-
-                <el-form-item label="邮箱" prop="xl_email">
-                    <el-input v-model="form.xl_email">
-                        <template #append>@tongji.edu.cn</template>
-                    </el-input>
-                </el-form-item>
-                <el-form-item label="密码" prop="xl_password">
-                    <el-input type="password" v-model="form.xl_password" show-password></el-input>
-                </el-form-item>
-                <el-form-item label="确认密码" prop="xl_password_confirm">
-                    <el-input type="password" v-model="form.xl_password_confirm" show-password></el-input>
-                </el-form-item>
-                <el-form-item label="验证码" prop="xl_veri_code">
-                    <el-input v-model="form.xl_veri_code">
-                    <template #append>
-                        <el-button type="primary" :id="emailCounter === 0 ? 'veribtn' : ''" @click="sendVerificationEmail" :disabled="emailCounter !== 0">{{ emailCounter === 0 ? '发送验证码' : `已发送(${emailCounter}s)` }}</el-button>
-                    </template>
-                    </el-input>
-                </el-form-item>
-                <el-form-item style="padding: 10px 0 0 0;">
-                    <el-button type="primary" @click="register" style="width: 100%">注册</el-button>
-                </el-form-item>
-                </el-form>
-                <el-button link type="primary" @click="this.$router.push('/login')" style="float: left; margin-left: 5px; margin-bottom: 10px">已有账号？</el-button>
-            </el-card>
-    </el-main>
-    </div>
     <!-- 电脑端 -->
-    <div v-else style="width: 100%">
+    <div style="width: 100%">
         <el-main style="display: flex; justify-content: center; padding: 5px 0 0 0">
         <div 
             class="background" 
@@ -111,6 +58,7 @@
 import axios from 'axios'
 import { passwordEncrypt } from '@/utils/xl_encrypt';
 import { ElMessage } from 'element-plus';
+import { get_csrf_token } from '@/utils/helpers';
 
 export default {
     data() {
@@ -152,11 +100,11 @@ export default {
     },
     methods: {
         async register() {
-            const formEl = this.$refs.ruleFormRef
-            if (!formEl) return
+            const formEl = this.$refs.ruleFormRef;
+            if (!formEl) return;
 
-            const valid = await formEl.validate()
-            if (!valid) return
+            const valid = await formEl.validate();
+            if (!valid) return;
 
             try {
                 await axios({
@@ -191,23 +139,26 @@ export default {
                     url: '/api/getUserInfo',
                     credentials: 'same-origin',
                     headers: {
-                        'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                        'X-CSRF-TOKEN': get_csrf_token(document.cookie)
                     },
                     data: {
                         xl_email: this.form.xl_email + '@tongji.edu.cn'
                     }
                 })
                 this.$store.commit('setUserInfo', response.data.data)
-                console.log("setUserInfo")
+                // console.log("setUserInfo")
             } catch (error) {
                 console.log(error)
                 throw error
             }
         },
         sendVerificationEmail() {
-            const formEl = this.$refs.ruleFormRef
-            if (!formEl) return
-            formEl.validateField('xl_email', (valid) => {
+            let formEl = this.$refs.ruleFormRef;
+
+            console.log(formEl);
+            if (!formEl) return;
+
+            formEl.validateField(["xl_email", "xl_password", "xl_password_confirm"], (valid) => {
                 if (valid) {
                     axios({
                         method: 'post',

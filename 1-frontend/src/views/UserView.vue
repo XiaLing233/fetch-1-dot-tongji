@@ -83,6 +83,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus';
 import { passwordEncrypt } from '@/utils/xl_encrypt';
+import { get_csrf_token } from '@/utils/helpers';
 
 export default {
     data() {
@@ -113,7 +114,7 @@ export default {
     methods: {
         handleSwitch() {
             return new Promise((resolve) => {
-                // 如果 cookie 为空，说明在另一个窗口退出了，这时候需要重新登录
+                // 如果 cookie 为空，说明手动删除了
                 if (!document.cookie) {
                 this.isLoading = false
                 ElMessage({
@@ -123,50 +124,51 @@ export default {
                     grouping: true
                 })
                 this.$store.commit('logout')
+                this.$router.push('/login')
                 return
                 }
                 axios({
                     url: '/api/toggleReceiveNoti',
                     method: 'post',
                     headers: {
-                        'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                        'X-CSRF-TOKEN': get_csrf_token(document.cookie)
                     },
                     data: {
                         xl_email: this.$store.state.userInfo.xl_email,
                         expect_option: !this.now_option
                     }
                 })
-                    .then(response => {
-                        // console.log(response)
-                        this.$store.commit('toggleNoti')
-                        ElMessage({
-                            message: '切换成功',
-                            grouping: true,
-                            type: 'success'
-                        })
-                        resolve(true)
+                .then(response => {
+                    // console.log(response)
+                    this.$store.commit('toggleNoti')
+                    ElMessage({
+                        message: '切换成功',
+                        grouping: true,
+                        type: 'success'
                     })
-                    .catch(error => {
-                        console.log(error)
-                        // 如果返回的状态码是 401，说明 token 过期了，需要重新登录
-                        if (error.response.status === 401) {
-                            this.$store.commit('logout')
-                            this.$router.push('/login')
-                            ElMessage({
-                            message: '登录已过期',
+                    resolve(true)
+                })
+                .catch(error => {
+                    console.log(error)
+                    // 如果返回的状态码是 401，说明 token 过期了，需要重新登录
+                    if (error.response.status === 401) {
+                        this.$store.commit('logout')
+                        this.$router.push('/login')
+                        ElMessage({
+                        message: '登录已过期',
+                        grouping: true,
+                        type: 'error'
+                    })
+                    }
+                    else{
+                        ElMessage({
+                            message: '网络错误，请稍后再试',
                             grouping: true,
                             type: 'error'
                         })
-                        }
-                        else{
-                            ElMessage({
-                                message: '网络错误，请稍后再试',
-                                grouping: true,
-                                type: 'error'
-                            })
-                        }
-                        resolve(false)
-                    })
+                    }
+                    resolve(false)
+                })
             })
         },
         changePassword() {
@@ -189,13 +191,13 @@ export default {
                         url: '/api/changePassword',
                         method: 'post',
                         headers: {
-                            'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                            'X-CSRF-TOKEN': get_csrf_token(document.cookie)
                         },
                         data: {
                             xl_email: this.$store.state.userInfo.xl_email,
                             xl_newpassword: passwordEncrypt(this.password.new)
                         }
-                    })
+                        })
                         .then(response => {
                             // console.log(response)
                             ElMessage({
@@ -229,7 +231,7 @@ export default {
             })
         },
         getUserInfo() {
-            if (!document.cookie) {
+            if (!document.cookie) { // 因为其他 cookie 是 httpOnly 的，所以这里只需要判断 csrf_access_token
                 this.isLoading = false
                 ElMessage({
                     title: '提示',
@@ -246,7 +248,7 @@ export default {
                 url: '/api/getUserInfo',
                 credentials: 'same-origin',
                 headers: {
-                    'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                    'X-CSRF-TOKEN': get_csrf_token(document.cookie)
                 },
                 data: {
                     xl_email: this.$store.state.userInfo.xl_email // 这里不用再加 @tongji.edu.cn 了

@@ -1,7 +1,14 @@
 <template>
     <div style="background-color: #f0f0f0; width: 100%; ; margin-top: 20px;">
         <div v-if="this.$store.state.isLoggedin">
-        <el-alert title="初次使用? 点此开始新手引导" type="success" style="margin-top: 20px" @click="beginTour = true"/>
+        <el-alert 
+            title="初次使用? 点此开始新手引导" 
+            type="success" 
+            style="margin-top: 20px"
+            @click="beginTour = true"
+            @close.stop="handleClose"
+            closable
+            :show-icon="true" />
         </div>
         <el-card
         style="margin: 20px auto; min-height: 800px;"
@@ -25,24 +32,29 @@
         <el-table
             :data="paginatedData"
             style="width: 100%"
-            :row-class-name="defRowLevel"
             height="600"
             stripe
+            border
             @row-click="findMyCommonMsgPublishById"
             @filter-change="handleFilter"
             >
             <el-table-column
                 prop="title"
                 label="标题"
+                align="center"
                 >
             </el-table-column>
             <el-table-column
                 prop="publish_time"
-                label="发布时间">
+                label="发布时间"
+                align="center"
+                >
             </el-table-column>
             <el-table-column
                 prop="end_time"
-                label="结束时间">
+                label="结束时间"
+                align="center"
+                >
             </el-table-column>
             <el-table-column
                 prop="status"
@@ -53,6 +65,7 @@
                     { text: '发布中', value: '发布中' },
                     { text: '已过期', value: '已过期' }
                 ]"
+                align="center"
                 >
                 <template #default="scope">
                     <el-tag 
@@ -150,6 +163,7 @@
     import { urlEncrypt } from '@/utils/xl_encrypt';
     import { ElMessage } from 'element-plus';
     import { Search } from '@element-plus/icons-vue'
+    import { get_csrf_token } from '@/utils/helpers';
 
     export default {
         data() {
@@ -231,7 +245,7 @@
                         url: '/api/findMyCommonMsgPublishById',
                         method: 'post',
                         headers: {
-                            'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                            'X-CSRF-TOKEN': get_csrf_token(document.cookie)
                         },
                         data: {
                             id: row.id
@@ -282,7 +296,7 @@
                     url: '/api/downloadAttachmentByFileName',
                     method: 'post',
                     headers: {
-                        'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+                        'X-CSRF-TOKEN': get_csrf_token(document.cookie)
                     },
                     data: {
                         fileLocation: encryptedFilename
@@ -315,7 +329,7 @@
             },
             // 当表格的筛选条件发生变化的时候会触发该事件，参数的值是一个对象，对象的 key 是 column 的 columnKey，对应的 value 为用户选择的筛选条件的数组。
             handleFilter(filters) {
-                console.log(filters)
+                // console.log(filters)
                 const status = filters['statusColumn'] // 需要在 el-table-column 中设置 column-key 属性才可以，不然传入的是个动态的值，每次刷新可能会变，需要写一个静态的值才好
                 if (status.length === 0) {
                     this.tempTableData = this.tableData
@@ -324,6 +338,9 @@
                     this.tempTableData = this.tableData.filter(row => status.includes(row.status))
                 }
                 this.pagi.total = this.tempTableData.length
+            },
+            handleClose() {
+                ;
             }
         },
         computed: {
@@ -343,11 +360,7 @@
 
 </script>
 
-<style>
-.el-table .top-row {
-  --el-table-tr-bg-color: var(--el-color-warning-light-9);
-}
-
+<style scoped>
 .notiAttachment {
     color: #409EFF;
     cursor: pointer;

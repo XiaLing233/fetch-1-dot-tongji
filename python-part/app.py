@@ -25,7 +25,7 @@ import logging
 
 # ----- 配置 ----- #
 
-PRODUCTION = True # 是否为生产环境
+PRODUCTION = False # 是否为生产环境
 
 # 读取配置文件
 
@@ -90,10 +90,10 @@ if PRODUCTION:
 Session(app)
 
 
-
 # ----- 功能函数 ----- #
 
-
+def triedTooManyTimes():
+    return session.get('tried_times', 0) >= 5
 
 # 发送注册邮件
 def sendEmailVerification(recEmail, token):
@@ -264,6 +264,7 @@ def sendVerificationEmail():
     session['verification_code'] = token
     session['email'] = xl_email
     session['send_time'] = time.time()
+    session['tried_times'] = 0
 
     # 发送邮件
     sendEmailVerification(xl_email, token)
@@ -328,6 +329,7 @@ def sendRecoveryEmail():
     session['verification_code'] = token
     session['email'] = xl_email
     session['send_time'] = time.time() # 发送时间
+    session['tried_times'] = 0
 
     # 发送邮件
     sendEmailFindPassword(xl_email, token)
@@ -358,6 +360,12 @@ def sendRecoveryEmail():
 '''
 @app.route('/api/register', methods=['POST'])
 def register():
+    if triedTooManyTimes():
+        return jsonify({
+            'code': 429,
+            'msg': '错误次数过多，请稍后再试'
+        }), 429
+
     # 获取参数
     xl_email = request.json.get('xl_email')
     xl_password = request.json.get('xl_password')
@@ -377,18 +385,20 @@ def register():
             'msg': '用户已注册，请登录'
         }), 400
 
-    # 检查验证码
-    if session.get('verification_code') != xl_veri_code:
-        return jsonify({
-            'code': 400,
-            'msg': '验证码错误'
-        }), 400
-
     # 检查验证码是否过期
     if time.time() - session.get('send_time') > 600:
         return jsonify({
             'code': 400,
             'msg': '验证码过期，请重新发送'
+        }), 400
+
+    # 检查验证码
+    if session.get('verification_code') != xl_veri_code:
+        session['tried_times'] += 1
+
+        return jsonify({
+            'code': 400,
+            'msg': f'验证码错误，您还有{5 - session.get("tried_times")}次机会'
         }), 400
 
     # 解密密码
@@ -415,6 +425,12 @@ def register():
     })
 
     set_access_cookies(response, access_token)
+
+    # 清空和验证码相关的 session
+    session.pop('verification_code', None)
+    session.pop('email', None)
+    session.pop('send_time', None)
+    session.pop('tried_times', None)
 
     # 设置 cookie，不在返回体中设置
     return response, 200
@@ -506,6 +522,12 @@ def login():
 '''
 @app.route('/api/recovery', methods=['POST'])
 def recovery():
+    if triedTooManyTimes():
+        return jsonify({
+            'code': 429,
+            'msg': '错误次数过多，请稍后再试'
+        }), 429
+
     # 获取参数
     xl_email = request.json.get('xl_email')
     xl_password = request.json.get('xl_password')
@@ -528,18 +550,20 @@ def recovery():
             'msg': '用户不存在'
         }), 400
 
-    # 检查验证码
-    if session.get('verification_code') != xl_veri_code:
-        return jsonify({
-            'code': 400,
-            'msg': '验证码错误'
-        }), 400
-
     # 检查验证码是否过期
     if time.time() - session.get('send_time') > 600:
         return jsonify({
             'code': 400,
             'msg': '验证码过期，请重新发送'
+        }), 400
+
+    # 检查验证码
+    if session.get('verification_code') != xl_veri_code:
+        session['tried_times'] += 1
+
+        return jsonify({
+            'code': 400,
+            'msg': f'验证码错误，您还有{5 - session.get("tried_times")}次机会'
         }), 400
 
     # 解密密码
@@ -565,6 +589,12 @@ def recovery():
     
     # 设置 cookie，不在返回体中设置
     # response.set_cookie('xl_token', access_token, httponly=True) #, samesite='Strict') #, secure=True)
+
+    # 清空和验证码相关的 session
+    session.pop('verification_code', None)
+    session.pop('email', None)
+    session.pop('send_time', None)
+    session.pop('tried_times', None)
 
     return response, 200
 

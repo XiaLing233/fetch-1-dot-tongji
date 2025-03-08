@@ -1,6 +1,3 @@
-import { RouterView } from 'vue-router';
-
-
 <template>
     <el-container>
       <el-header>
@@ -114,11 +111,6 @@ import { RouterView } from 'vue-router';
   display: flex;
   align-items: center;
 }
-
-.open {
-  transform: rotate(0deg);
-}
-
 </style>
 
 <script>
@@ -127,6 +119,7 @@ import { RouterView } from 'vue-router';
   import axios from 'axios';
   import malePNG from '@/assets/male.png';
   import { ElMessage } from 'element-plus';
+  import { get_csrf_token } from './utils/helpers';
 
   export default {
     data() {
@@ -148,36 +141,24 @@ import { RouterView } from 'vue-router';
     },
     methods:
     {
-      logout() {
-      if (!document.cookie) {
-              this.isLoading = false
-              ElMessage({
-                  title: '提示',
-                  message: '您还未登录，请先登录',
-                  type: 'warning',
-                  grouping: true
-              })
-              this.$store.commit('logout')
-              this.$router.push('/login')
-              return
-          }
+      async logout() {
         // 清空 vuex 中的所有数据
         this.$store.commit('logout')
         this.$router.push('/login')
+
         // 让后端清除 cookie
-        axios({
+        try {
+          await axios({
           method: 'get',
           url: '/api/logout',
           headers: {
-            'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+            'X-CSRF-TOKEN': get_csrf_token(document.cookie)
           },
         })
-        .then(response => {
-          // console.log(response)
-        })
-        .catch(error => {
+        }
+        catch(error) {
           console.log(error)
-        })
+        }
       },
       handleMenu()
       {
@@ -185,35 +166,34 @@ import { RouterView } from 'vue-router';
         // console.log(this.openMenu)
       },
       // 定期向后端请求，测试 token 是否过期
-      checkToken()
+      async checkToken()
       {
         if (this.$store.state.isLoggedin) {
-          axios({
+          try {
+            await axios({
             method: 'get',
             url: '/api/checkToken',
             headers: {
-              'X-CSRF-TOKEN': document.cookie.split('; ').find(row => row.startsWith('csrf_access_token=')).split('=')[1]
+              'X-CSRF-TOKEN': get_csrf_token(document.cookie)
             },
           })
-          .then(response => {
-            // console.log(response)
-          })
-          .catch(error => {
+          }
+          catch(error) {
             console.log(error)
-            if (error.response.status === 401) {
-              this.openAlertDialog = true
-              this.$store.commit('logout')
-              this.$router.push('/login')
+            if (!error.response || error.response.status !== 500) { // 可能是 cookie 被手动删除了，或者 token 过期了
+              this.openAlertDialog = true;  // 提示用户登录状态已过期
+              this.$store.commit('logout');
+              this.$router.push('/login');
+            }
+            else {
+              ElMessage({
+                title: '提示',
+                message: '未知错误，请联系管理员',
+                type: 'error',
+                grouping: true
+              })
+            }
           }
-          else {
-            ElMessage({
-              title: '提示',
-              message: '未知错误，请联系管理员',
-              type: 'error',
-              grouping: true
-            })
-          }
-        })
         }
       },
       checkTokenTimely()
