@@ -1,7 +1,7 @@
 # Flask 后端
 
 from flask import Flask, request, jsonify, session
-from flask_cors import CORS
+# from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, set_access_cookies, unset_access_cookies
 from flask_mail import Mail, Message
 from flask_session import Session
@@ -46,7 +46,7 @@ IMG_PATH = CONFIG['Storage']['img_path'] # 背景图片路径
 
 app = Flask(__name__)
 
-CORS(app, supports_credentials=True) # 支持跨域
+# CORS(app, supports_credentials=True) # 支持跨域
 
 # 设置 JWT
 app.config['JWT_SECRET_KEY'] = SECRET_KEY

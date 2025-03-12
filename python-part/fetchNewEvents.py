@@ -283,7 +283,7 @@ def handleDownloadfile(session, attachment):
         response = session.get(download_url)
 
     # 保存到本地
-    localFilePath = STORE_PATH + "/" + attachment['fileName'] # 要和返回的 key 对应，不要乱起名
+    localFilePath = STORE_PATH + "/" + attachment['fileName'] # 要和返回的 key 对应，不要乱起名，不过这个文件名和 1 系统返回的其实也不一样
 
     with open(localFilePath, "wb") as f:
         f.write(response.content)
@@ -319,7 +319,7 @@ def sendNotiEmail(event):
         # 结尾
         msg.attach(MIMEText("<br>请您及时查看，谢谢！<br>琪露诺bot", 'html'))
 
-        print(msg)
+        # print(msg)
         
         # 发送邮件
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:

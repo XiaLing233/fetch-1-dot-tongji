@@ -5,7 +5,7 @@ from Crypto.PublicKey import RSA # RSA 加密
 from Crypto.Cipher import PKCS1_v1_5 # RSA 加密
 from Crypto.Cipher import AES # AES 加密
 import base64 # base64 编码
-from urllib.parse import quote_plus
+from urllib.parse import quote
 
 # 读取配置文件
 
@@ -105,9 +105,15 @@ def encryptFilePath(js_url, filePath):
 
     # print(filePath)
     # 把 filePath 进行 URI 编码，使用 quote_plus 以确保 / 被编码为 %2F
-    filePath = quote_plus(filePath)
 
     # print(filePath)
+    # input('Press Enter to continue...')
+
+    filePath = quote(filePath, safe='') # 移除 safe 参数，确保所有字符都被编码
+    # filePath = quote_plus(filePath) # 也可以使用 quote_plus，默认 safe='/'，但是会把空格编码为 + 而不是 %20
+
+    # print(filePath)
+    # input('Press Enter to continue...')
 
     # PKCS7 填充
     block_size = 16
@@ -118,8 +124,11 @@ def encryptFilePath(js_url, filePath):
     cipher = AES.new(key.encode(), AES.MODE_CBC, iv.encode())
     cipher_text = cipher.encrypt(padded_text.encode())
 
+    # print(cipher_text)
+    # input('Press Enter to continue...')
+
     # base64 编码
-    cipher_text = quote_plus(base64.b64encode(cipher_text).decode())
+    cipher_text = quote(base64.b64encode(cipher_text).decode(), safe='') # 这里也要进行 URI 编码，确保 + 和 / 被编码为 %2B 和 %2F
 
     return cipher_text # 返回 URI 编码后的密文
 
