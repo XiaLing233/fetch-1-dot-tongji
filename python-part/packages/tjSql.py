@@ -327,6 +327,8 @@ def sqlFindAttachmentById(attachment_id):
         f"SELECT * FROM {A_TABLE_NAME} WHERE {A_ID} = %s"
     )
 
+    print(attachment_id)
+
     print("执行的 SQL 语句是：", sql)
 
     cursor.execute(sql, (attachment_id,))
@@ -363,10 +365,12 @@ def sqlFindMyCommonMsgPublishById(notification_id):
 
     # 查询附件的信息
     for attachment in attachments:
+        print(attachment)
         attachment_info = sqlFindAttachmentById(attachment[0])
         # 只保留 id 和 fileName
         attachment_info = {
-            f'{ A_FILENAME }': attachment_info[0][1]
+            f'{ A_FILENAME }': attachment_info[0][1],
+            f'{ A_FILE_LOCATION_LOCAL }': attachment_info[0][3]
         }
 
         # 判断附件的类型，新建 fileType 字段

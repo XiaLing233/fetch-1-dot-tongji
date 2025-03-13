@@ -129,7 +129,7 @@
                      <div style="display: flex; align-items: baseline;">
                         <div :class="attachment.fileType"></div>
                         <div style="margin-bottom: 2px;">
-                            <span class="notiAttachment" @click="downloadAttachmentByFileName(attachment.filename)">{{ attachment.filename }}</span>
+                            <span class="notiAttachment" @click="downloadAttachmentByFileName(attachment.file_location_local)">{{ attachment.filename }}</span>
                         </div>
                      </div>
                     

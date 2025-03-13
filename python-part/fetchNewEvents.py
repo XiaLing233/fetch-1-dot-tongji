@@ -283,7 +283,7 @@ def handleDownloadfile(session, attachment):
         response = session.get(download_url)
 
     # 保存到本地
-    localFilePath = STORE_PATH + "/" + attachment['fileName'] # 要和返回的 key 对应，不要乱起名，不过这个文件名和 1 系统返回的其实也不一样
+    localFilePath = STORE_PATH + "/" + attachment['fileLacation'].split('/')[-1] # 要和返回的 key 对应，不要乱起名
 
     with open(localFilePath, "wb") as f:
         f.write(response.content)
@@ -306,10 +306,11 @@ def sendNotiEmail(event):
 
         # 邮件正文，HTML 格式
         msg.attach(MIMEText(f"尊敬的 {to[U_NICKNAME]}：", 'html'))
+        msg.attach(MIMEText(f"<br>通知标题：<b>{event['title']}</b><br>", 'html'))
         msg.attach(MIMEText(event['content'], 'html'))
 
         # 把附件名称加入邮件，不要附件内容
-        if (event['commonAttachmentList'] != None): # 有附件
+        if (event['commonAttachmentList'] != []): # 有附件
             msg.attach(MIMEText("<br>该通知包含以下" + str(len(event['commonAttachmentList'])) + "个附件: <br>", 'html'))
             for attachment in event['commonAttachmentList']:
                 msg.attach(MIMEText(attachment['fileName'] + "<br>", 'html'))
@@ -366,6 +367,9 @@ def processEvents(session, events):
             for attachment in event['commonAttachmentList']:
                 try:
                     # 如果附件已经存在，就不再插入
+                    # 这里可能有一个问题是，附件的 id 不一样，但是下载文件的地址却是一样的
+                    # 我推测的原因可能是，发布者更新了附件，原地址不变，但是 id 却递增了
+                    #TODO：到时候再说吧
                     if sqlFindAttachmentById(attachment["id"]):
                         print("附件已存在！")
                         continue
@@ -438,8 +442,24 @@ def processEvents(session, events):
 
 # ----- 生产环境 ----- #
 
-session = login()
+if __name__ == "__main__":
+    session = login()
 
-events = findMyCommonMsgPublish(session)
+    events = findMyCommonMsgPublish(session)
 
-processEvents(session, events)
+    processEvents(session, events)
+
+
+# 调试
+# if __name__ == "__main__":
+#     session = login()
+
+#     while True:
+#         fileName = input()
+
+#         attachment = {
+#             "fileLacation": fileName,
+#             "test": True,
+#         }
+
+#         print(handleDownloadfile(session, attachment))
