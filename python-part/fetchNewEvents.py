@@ -3,12 +3,14 @@
 
 import requests # 用于发送 HTTP 请求
 from packages import myEncrypt # 用于加密密码
+from packages import imap_email
 import time # 生成时间戳
 import datetime # 生成时间
 import configparser # 读取配置文件
 from urllib.parse import urlencode # 用于编码请求体
 from packages.tjSql import sqlInsertNotification, sqlHaveRecorded, sqlInsertAttachment, sqlInsertRelation, sqlGetAllReceiveNotiUser, sqlUpdateNotification, sqlFindAttachmentById # 用于写入数据库
 import json
+import xml.etree.ElementTree as ET
 
 # 邮件
 from email.mime.text import MIMEText
@@ -49,6 +51,12 @@ SMTP_PORT = CONFIG['Email']['smtp_port']
 SMTP_USERNAME = CONFIG['Email']['smtp_username_batch'] # 是营销邮件，需要批量发送
 SMTP_PASSWORD = CONFIG['Email']['smtp_password_batch']
 
+# 加强认证
+IMAP_SERVER = CONFIG["IMAP"]["server_domain"]
+IMAP_PORT = CONFIG["IMAP"]["server_port"]
+IMAP_USERNAME =  CONFIG["IMAP"]["qq_emailaddr"]
+IMAP_PASSWORD =  CONFIG["IMAP"]["qq_grantcode"]
+
 U_NICKNAME = CONFIG['Table']['u_nickname']
 U_EMAIL = CONFIG['Table']['u_email']
 
@@ -62,7 +70,6 @@ def debug_response(step, response):
 
 # 登录
 def login():
-
     # ----- 第一步：登录前页面 ----- #
 
     entry_url = "https://1.tongji.edu.cn/api/ssoservice/system/loginIn"
@@ -88,21 +95,22 @@ def login():
 
     # ----- 第二步：ActionAuthChain ----- #
 
-    global RSA_URL
     # 获取 RSA 公钥所在 js 文件的链接
     for line in response.text.split('\n'):
         if 'crypt.js' in line:
             RSA_URL = "https://iam.tongji.edu.cn/idp/" + line.split('src=\"')[1].split('\"')[0]
             print(RSA_URL)
 
-    chain_url = response.url
+    CHAIN_URL = response.url
+
+    SP_AUTH_CHAIN_CODE = myEncrypt.getspAuthChainCode(response.text)
 
     login_data = urlencode({
         "j_username": myEncrypt.STU_NO,
         "j_password": myEncrypt.encryptPassword(RSA_URL),
         "j_checkcode": "请输入验证码",
         "op": "login",
-        "spAuthChainCode": myEncrypt.getspAuthChainCode(response.text), # 似乎是个固定值，写死在页面的 
+        "spAuthChainCode": SP_AUTH_CHAIN_CODE, # 似乎是个固定值，写死在页面的 
         "authnLcKey": authnLcKey,
     })
 
@@ -117,13 +125,63 @@ def login():
         }
     )
     if ENABLE_PROXY:
-        response = session.post(chain_url, data=login_data, allow_redirects=False, proxies=PROXIES)
+        response = session.post(CHAIN_URL, data=login_data, allow_redirects=False, proxies=PROXIES)
     else:
-        response = session.post(chain_url, data=login_data, allow_redirects=False)
+        response = session.post(CHAIN_URL, data=login_data, allow_redirects=False)
+
+    # ----- 第 2.5 步 加强认证 ----- #
+
+    is_enhance = False  # Flag
+
+    # 检查是否需要加强认证
+    response_xml = ET.fromstring(response.text)  # 虽然是 json，但是本质是 XML 格式
+
+    if response_xml.find('loginFailed').text != 'false':
+        is_enhance = True  # 是加强认证
+
+        # 发送验证码
+        veri_data = urlencode({
+            "j_username": myEncrypt.STU_NO,
+            "type": "email" #  邮箱是 email，短信是 sms
+        })  # 格式是 form_data
+
+        if ENABLE_PROXY:
+            session.post("https://iam.tongji.edu.cn/idp/sendCheckCode.do",
+                        data=veri_data, allow_redirects=False, proxies=PROXIES)
+        else:
+            session.post("https://iam.tongji.edu.cn/idp/sendCheckCode.do",
+                        data=veri_data, allow_redirects=False)
+
+        time.sleep(20)  # 等待 20 秒
+
+        with imap_email.EmailVerifier(IMAP_USERNAME, IMAP_PASSWORD, IMAP_SERVER, IMAP_PORT) as v:
+            code = v.get_latest_verification_code()
+            if code:
+                print(code)
+            else:
+                raise("登录失败！未找到验证码")
+
+        login_data = urlencode({
+        "j_username": myEncrypt.STU_NO,
+        "type": "email",
+        "sms_checkcode": code,
+        "popViewException": "Pop2",
+        "j_checkcode": "请输入验证码",
+        "op": "login",
+        "spAuthChainCode": SP_AUTH_CHAIN_CODE, # 似乎是个固定值，写死在页面的 
+    })
+
+    if ENABLE_PROXY:
+        response = session.post(CHAIN_URL, data=login_data, allow_redirects=False, proxies=PROXIES)
+    else:
+        response = session.post(CHAIN_URL, data=login_data, allow_redirects=False)
 
     # ----- 第三步：AuthnEngine ----- #
 
-    auth_url = "https://iam.tongji.edu.cn/idp/AuthnEngine?currentAuth=urn_oasis_names_tc_SAML_2.0_ac_classes_BAMUsernamePassword&authnLcKey=" + authnLcKey + "&entityId=SYS20230001"
+    if is_enhance:
+        auth_url = "https://iam.tongji.edu.cn/idp/AuthnEngine?currentAuth=urn_oasis_names_tc_SAML_2.0_ac_classes_SMSUsernamePassword&authnLcKey=" + authnLcKey + "&entityId=SYS20230001"
+    else:  # Not enhance
+        auth_url = "https://iam.tongji.edu.cn/idp/AuthnEngine?currentAuth=urn_oasis_names_tc_SAML_2.0_ac_classes_BAMUsernamePassword&authnLcKey=" + authnLcKey + "&entityId=SYS20230001"
 
     if ENABLE_PROXY:
         response = session.post(auth_url, data=login_data, allow_redirects=False, proxies=PROXIES)
@@ -443,11 +501,14 @@ def processEvents(session, events):
 # ----- 生产环境 ----- #
 
 if __name__ == "__main__":
-    session = login()
+    #try:
+        session = login()
+        
+        events = findMyCommonMsgPublish(session)
 
-    events = findMyCommonMsgPublish(session)
-
-    processEvents(session, events)
+        processEvents(session, events)
+    #except Exception as e:
+        # print(e)
 
 
 # 调试
@@ -462,4 +523,4 @@ if __name__ == "__main__":
 #             "test": True,
 #         }
 
-#         print(handleDownloadfile(session, attachment))
+#         print(handleDownloadfile(session, attachment))"""
