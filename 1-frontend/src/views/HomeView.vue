@@ -93,13 +93,13 @@
     <!-- 提示区 -->
     <el-dialog
         v-model="openAlertDialog"
-        title="提示"
+        :title="alert.title"
         width="500"
     >
-        <p>您还未登录，请先登录</p>
+        <p v-html="alert.content"></p>
         <template #footer>
             <el-button @click="openAlertDialog = false">取消</el-button>
-            <el-button type="primary" @click="this.$router.push('/login')">确定</el-button>
+            <el-button type="primary" @click=alert.callback>确定</el-button>
         </template>
     </el-dialog>
 
@@ -181,6 +181,11 @@
                         fileName: '',
                         fileType: '',
                     }
+                },
+                alert: {
+                    title: '错误提示',
+                    content: '',
+                    callback: () => this.$router.push('/login')
                 },
                 pagi: {
                     currentPage: 1,
@@ -276,6 +281,8 @@
                 }
                 else
                 {
+                    this.alert.content = "您还未登录，请先登录"
+                    this.alert.callback = () => this.$router.push('/login')
                     this.openAlertDialog = true
                 }
             },
@@ -318,6 +325,12 @@
                     if (err.response.status === 401) {
                         this.$store.commit('logout')
                         this.$router.push('/login')
+                    }
+                    else if (err.response.status === 400) {
+                        console.log(err)
+                        this.alert.content = err.response.data.content;
+                        this.alert.callback = () => this.openAlertDialog = false;
+                        this.openAlertDialog = true;
                     }
                 })       
                 },

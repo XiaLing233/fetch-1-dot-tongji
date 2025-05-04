@@ -18,6 +18,10 @@ from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
 import smtplib
 
+# COS
+from packages.upload_to_cos import CosUpload
+
+MYCOS = CosUpload()
 
 # 数据库
 
@@ -152,7 +156,7 @@ def login():
             session.post("https://iam.tongji.edu.cn/idp/sendCheckCode.do",
                         data=veri_data, allow_redirects=False)
 
-        time.sleep(20)  # 等待 20 秒
+        time.sleep(30)  # 等待 30 秒
 
         with imap_email.EmailVerifier(IMAP_USERNAME, IMAP_PASSWORD, IMAP_SERVER, IMAP_PORT) as v:
             code = v.get_latest_verification_code()
@@ -327,7 +331,7 @@ def findCommonMsgPublishById(session, id):
 # 处理附件
 def handleDownloadfile(session, attachment):
     # 生成下载链接
-    download_url = f"https://1.tongji.edu.cn/api/commonservice/obsfile/downloadfile?objectkey="
+    download_url = "https://1.tongji.edu.cn/api/commonservice/obsfile/downloadfile?objectkey="
 
     # 对文件名进行加密
     remotefilePath = myEncrypt.encryptFilePath(AES_URL, attachment['fileLacation']) # 要和返回的 key 对应，不要乱起名。我也很惊讶，但就是 Lacation...
@@ -341,12 +345,19 @@ def handleDownloadfile(session, attachment):
         response = session.get(download_url)
 
     # 保存到本地
-    localFilePath = STORE_PATH + "/" + attachment['fileLacation'].split('/')[-1] # 要和返回的 key 对应，不要乱起名
+    # localFilePath = STORE_PATH + "/" + attachment['fileLacation'].split('/')[-1] # 要和返回的 key 对应，不要乱起名
 
-    with open(localFilePath, "wb") as f:
-        f.write(response.content)
+    # with open(localFilePath, "wb") as f:
+    #     f.write(response.content)
 
-    return localFilePath.replace(STORE_PATH + "/", "") # 返回相对路径
+    # return localFilePath.replace(STORE_PATH + "/", "") # 返回相对路径
+
+    cosFilePath = f"{STORE_PATH}/{attachment['fileLacation'.split][-1]}"
+
+    MYCOS.upload_from_bytes(content=response.content, object_key=cosFilePath)
+
+    return cosFilePath
+
     
 # 发送新活动邮件
 # event 是一个元组，包含 title 和 content 等

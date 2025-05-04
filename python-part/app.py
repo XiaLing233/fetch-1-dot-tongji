@@ -21,6 +21,11 @@ import base64 # base64 编码
 
 import logging
 
+# COS
+from packages.upload_to_cos import CosUpload
+
+MYCOS = CosUpload()
+
 # 不需要链接数据库，因为由 tjSql 完成
 
 # ----- 配置 ----- #
@@ -232,14 +237,14 @@ def sendVerificationEmail():
     xl_email = request.json.get('xl_email')
 
     # 检查邮箱格式
-    if checkEmailFormat(xl_email) == False:
+    if not checkEmailFormat(xl_email):
         return jsonify({
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
         }), 400
 
     # 检查用户名是否存在
-    if tjSql.sqlUserExist(xl_email) == True:
+    if tjSql.sqlUserExist(xl_email):
         return jsonify({
             'code': 400,
             'msg': '用户已注册，请登录'
@@ -297,14 +302,14 @@ def sendRecoveryEmail():
     xl_email = request.json.get('xl_email')
 
     # 检查邮箱格式
-    if checkEmailFormat(xl_email) == False:
+    if not checkEmailFormat(xl_email):
         return jsonify({
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
         }), 400
 
     # 检查用户是否存在
-    if tjSql.sqlUserExist(xl_email) == False:
+    if not tjSql.sqlUserExist(xl_email):
         return jsonify({
             'code': 400,
             'msg': '用户不存在，请移步注册页面'
@@ -372,14 +377,14 @@ def register():
     xl_veri_code = request.json.get('xl_veri_code')
 
     # 检查邮箱格式
-    if checkEmailFormat(xl_email) == False:
+    if not checkEmailFormat(xl_email):
         return jsonify({
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
         }), 400
 
     # 检查用户名是否存在
-    if tjSql.sqlUserExist(xl_email) == True:
+    if tjSql.sqlUserExist(xl_email):
         return jsonify({
             'code': 400,
             'msg': '用户已注册，请登录'
@@ -461,7 +466,7 @@ def login():
     xl_password = request.json.get('xl_password')
 
     # 先判断用户名是否存在
-    if tjSql.sqlUserExist(xl_email) == False:
+    if not tjSql.sqlUserExist(xl_email):
         return jsonify({
             'code': 400,
             # 'msg': '用户不存在'
@@ -479,7 +484,7 @@ def login():
     # 验证密码
     try: 
         PasswordHasher().verify(hashed_password, xl_password)
-    except:
+    except Exception:
         return jsonify({
             'code': 400,
             # 'msg': '密码错误'
@@ -537,14 +542,14 @@ def recovery():
     print("传入的验证码：", xl_veri_code)
 
     # 检查邮箱格式
-    if checkEmailFormat(xl_email) == False:
+    if not checkEmailFormat(xl_email):
         return jsonify({
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
         }), 400
 
     # 检查用户名是否存在
-    if tjSql.sqlUserExist(xl_email) == False:
+    if not tjSql.sqlUserExist(xl_email):
         return jsonify({
             'code': 400,
             'msg': '用户不存在'
@@ -752,11 +757,18 @@ def downloadAttachmentByFileName():
     print("文件路径：", filePath)
 
     # 读取文件
-    with open(f'{ATTACHMENT_PATH}/{filePath}', 'rb') as f:
-        content = f.read()
+    # with open(f'{ATTACHMENT_PATH}/{filePath}', 'rb') as f:
+    #     content = f.read()
 
-    return content
-
+    try:
+        content = MYCOS.download_as_bytes(target_link=f"{ATTACHMENT_PATH}/{filePath}")
+        return content
+    
+    except Exception as e:
+        print(e)
+        return jsonify({
+            "content": e.__str__()
+        }), 400
 
 # 获取用户信息
 @app.route('/api/getUserInfo', methods=['POST'])
