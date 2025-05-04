@@ -760,15 +760,20 @@ def downloadAttachmentByFileName():
     # with open(f'{ATTACHMENT_PATH}/{filePath}', 'rb') as f:
     #     content = f.read()
 
-    try:
-        content = MYCOS.download_as_bytes(target_link=f"{ATTACHMENT_PATH}/{filePath}")
-        return content
+    return jsonify({
+        "code": 200,
+        "location": MYCOS.generate_temporary_url(f"{ATTACHMENT_PATH}/{filePath}")
+    })
+
+    # try:
+    #     content = MYCOS.download_as_bytes(target_link=f"{ATTACHMENT_PATH}/{filePath}")
+    #     return content
     
-    except Exception as e:
-        print(e)
-        return jsonify({
-            "content": e.__str__()
-        }), 400
+    # except Exception as e:
+    #     print(e)
+    #     return jsonify({
+    #         "content": e.__str__()
+    #     }), 400
 
 # 获取用户信息
 @app.route('/api/getUserInfo', methods=['POST'])

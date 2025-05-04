@@ -18,7 +18,8 @@ class CosUpload():
 
         config = CosConfig(Region=region, 
                            SecretId=secret_id, 
-                           SecretKey=secret_key)
+                           SecretKey=secret_key
+                           )
         
         self.client = CosS3Client(config)
     
@@ -55,6 +56,16 @@ class CosUpload():
                             f"请求的资源为: {processed['resource']}<br>"
                             f"错误码: {processed['code']}<br>"
                             f"详细信息: {processed['message']}")
+    
+    def generate_temporary_url(self, key):
+        """
+        生成临时具有权限的下载链接
+        """
+        url = self.client.get_presigned_download_url(Bucket=self.bucket_name,
+                                                     Key=key)
+        print(url)
+
+        return url
 
 
 if __name__ == "__main__":
@@ -64,8 +75,12 @@ if __name__ == "__main__":
     #     foo.upload_from_bytes(f, "backup/upload_to_cos.py")
     
     # 下载测试
-    try:
-        foo = CosUpload()
-        foo.download_as_bytes(target_link="backup/upload_to_cos1.py")
-    except Exception as e:
-        print(e)
+    # try:
+    #     foo = CosUpload()
+    #     foo.download_as_bytes(target_link="backup/upload_to_cos1.py")
+    # except Exception as e:
+    #     print(e)
+
+    # 生成链接测试
+    foo = CosUpload()
+    foo.generate_temporary_url(key="backup/upload_to_cos.py")
