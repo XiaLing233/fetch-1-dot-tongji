@@ -156,70 +156,86 @@ def login():
             session.post("https://iam.tongji.edu.cn/idp/sendCheckCode.do",
                         data=veri_data, allow_redirects=False)
 
-        time.sleep(30)  # 等待 30 秒
+        sleep_time = 30
+        failed_time = 0
 
-        with imap_email.EmailVerifier(IMAP_USERNAME, IMAP_PASSWORD, IMAP_SERVER, IMAP_PORT) as v:
-            code = v.get_latest_verification_code()
-            if code:
-                print(code)
-            else:
-                raise("登录失败！未找到验证码")
+        while True:
+            try:
+                time.sleep(sleep_time)  # 等待 30 秒
 
-        login_data = urlencode({
-        "j_username": myEncrypt.STU_NO,
-        "type": "email",
-        "sms_checkcode": code,
-        "popViewException": "Pop2",
-        "j_checkcode": "请输入验证码",
-        "op": "login",
-        "spAuthChainCode": SP_AUTH_CHAIN_CODE, # 似乎是个固定值，写死在页面的 
-    })
+                with imap_email.EmailVerifier(IMAP_USERNAME, IMAP_PASSWORD, IMAP_SERVER, IMAP_PORT) as v:
+                    code = v.get_latest_verification_code()
+                    if code:
+                        print(code)
+                    else:
+                        raise Exception("登录失败！未找到验证码")
 
-    if ENABLE_PROXY:
-        response = session.post(CHAIN_URL, data=login_data, allow_redirects=False, proxies=PROXIES)
-    else:
-        response = session.post(CHAIN_URL, data=login_data, allow_redirects=False)
+                login_data = urlencode({
+                "j_username": myEncrypt.STU_NO,
+                "type": "email",
+                "sms_checkcode": code,
+                "popViewException": "Pop2",
+                "j_checkcode": "请输入验证码",
+                "op": "login",
+                "spAuthChainCode": SP_AUTH_CHAIN_CODE, # 似乎是个固定值，写死在页面的
+                })
 
-    # ----- 第三步：AuthnEngine ----- #
+                if ENABLE_PROXY:
+                    response = session.post(CHAIN_URL, data=login_data, allow_redirects=False, proxies=PROXIES)
+                else:
+                    response = session.post(CHAIN_URL, data=login_data, allow_redirects=False)
 
-    if is_enhance:
-        auth_url = "https://iam.tongji.edu.cn/idp/AuthnEngine?currentAuth=urn_oasis_names_tc_SAML_2.0_ac_classes_SMSUsernamePassword&authnLcKey=" + authnLcKey + "&entityId=SYS20230001"
-    else:  # Not enhance
-        auth_url = "https://iam.tongji.edu.cn/idp/AuthnEngine?currentAuth=urn_oasis_names_tc_SAML_2.0_ac_classes_BAMUsernamePassword&authnLcKey=" + authnLcKey + "&entityId=SYS20230001"
+                # ----- 第三步：AuthnEngine ----- #
 
-    if ENABLE_PROXY:
-        response = session.post(auth_url, data=login_data, allow_redirects=False, proxies=PROXIES)
-    else:
-        response = session.post(auth_url, data=login_data, allow_redirects=False)
+                if is_enhance:
+                    auth_url = "https://iam.tongji.edu.cn/idp/AuthnEngine?currentAuth=urn_oasis_names_tc_SAML_2.0_ac_classes_SMSUsernamePassword&authnLcKey=" + authnLcKey + "&entityId=SYS20230001"
+                else:  # Not enhance
+                    auth_url = "https://iam.tongji.edu.cn/idp/AuthnEngine?currentAuth=urn_oasis_names_tc_SAML_2.0_ac_classes_BAMUsernamePassword&authnLcKey=" + authnLcKey + "&entityId=SYS20230001"
 
-    # ----- 第四步：SSO 登录 ----- #
+                if ENABLE_PROXY:
+                    response = session.post(auth_url, data=login_data, allow_redirects=False, proxies=PROXIES)
+                else:
+                    response = session.post(auth_url, data=login_data, allow_redirects=False)
 
-    sso_url = response.headers['Location']
+                # ----- 第四步：SSO 登录 ----- #
+
+                sso_url = response.headers['Location']
+                
+                # 有必要更新 headers
+                sso_headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    'Accept-Language': 'zh-CN,zh;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br, zstd',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                }
+                
+                session.headers.clear() # 记得清空 headers，因为有 Content-Type 等不需要的字段
+                session.headers.update(sso_headers)
+
+                if ENABLE_PROXY:
+                    response = session.get(sso_url, allow_redirects=False, proxies=PROXIES)
+                else:
+                    response = session.get(sso_url, allow_redirects=False)
+
+                # ----- 第五步：LoginIn code & state----- #
+
+                loginIn_url = response.headers['Location']  # 如果给的验证码不正确, 这里不会有 Location 属性
+
+                if ENABLE_PROXY:
+                    response = session.get(loginIn_url, allow_redirects=False, proxies=PROXIES)
+                else:
+                    response = session.get(loginIn_url, allow_redirects=False)
+
+                break
+            except Exception as e:
+                print(f"发生异常{e}，继续")
+                sleep_time = 10 + 5 * failed_time
+                failed_time += 1
+
+                if failed_time > 5:
+                    print("登录失败，尝试次数过多")
+                    return None
     
-    # 有必要更新 headers
-    sso_headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Accept-Language': 'zh-CN,zh;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br, zstd',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-    }
-    
-    session.headers.clear() # 记得清空 headers，因为有 Content-Type 等不需要的字段
-    session.headers.update(sso_headers)
-
-    if ENABLE_PROXY:
-        response = session.get(sso_url, allow_redirects=False, proxies=PROXIES)
-    else:
-        response = session.get(sso_url, allow_redirects=False)
-
-    # ----- 第五步：LoginIn code & state----- #
-
-    loginIn_url = response.headers['Location']
-
-    if ENABLE_PROXY:
-        response = session.get(loginIn_url, allow_redirects=False, proxies=PROXIES)
-    else:
-        response = session.get(loginIn_url, allow_redirects=False)
 
     # ----- 第六步：ssologin token----- #
 
@@ -352,11 +368,11 @@ def handleDownloadfile(session, attachment):
 
     # return localFilePath.replace(STORE_PATH + "/", "") # 返回相对路径
 
-    cosFilePath = f"{STORE_PATH}/{attachment['fileLacation'.split][-1]}"
+    cosFilePath = f"{STORE_PATH}/{attachment['fileLacation'].split('/')[-1]}"
 
     MYCOS.upload_from_bytes(content=response.content, object_key=cosFilePath)
 
-    return cosFilePath
+    return cosFilePath.replace(STORE_PATH + "/", "") # 返回相对路径
 
     
 # 发送新活动邮件
@@ -448,7 +464,7 @@ def processEvents(session, events):
                     sqlInsertRelation(event['id'], attachment['id'])
                     print("插入关系成功！")
                 except Exception as e:
-                    print("处理附件失败！") # 发现有的通知居然有假的附件！点了链接没反应！不要因为某个附件失败就中断整个程序
+                    print(f"{e}\n处理附件失败！") # 发现有的通知居然有假的附件！点了链接没反应！不要因为某个附件失败就中断整个程序
                 time.sleep(5) # 不要频繁请求
 
     # 退出登录
