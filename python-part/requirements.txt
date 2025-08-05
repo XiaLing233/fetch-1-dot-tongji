@@ -31,7 +31,7 @@ PyJWT==2.10.1
 PySocks==1.7.1
 pytz==2024.2
 redis==5.2.1
-requests==2.32.3
+requests==2.32.4
 six==1.17.0
 soupsieve==2.6
 typing_extensions==4.13.0
