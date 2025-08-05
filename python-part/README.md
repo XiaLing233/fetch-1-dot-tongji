@@ -4,135 +4,126 @@
 
 ```ini
 [Account]
-sno = 1234567   # 学号
-passwd = 1234567 # 明文密码
+sno = 2365472
+passwd = 
 
 ; [Js]
-; rsa_url = https://iam.tongji.edu.cn/xxx # rsa 公钥所在位置
-; aes_url = https://1.tongji.edu.cn/xxx # aes iv 和公钥所在位置
+; deprecated
+; rsa_url = https://iam.tongji.edu.cn/idp/themes/default/js/main/crypt.js?date=202211232020
+; aes_url = https://1.tongji.edu.cn/static/js/app.e03cb41897b900e3dd87.js
 
 [Sql]
-host = 
-user = 
+; 登录 SQL 的账户信息
+host = localhost
+user = cirno
 password = 
-database = 
-port = 
-charset = 
+database = tongjinoti
+port = 3306
+charset = utf8mb4
 
 [Table]
-# Notification table
-n_table_name = 
-n_id = 
-n_title = 
-n_content = 
-n_start_time = 
-n_end_time = 
-n_invalid_top_time =
-n_create_id = 
-n_create_user = 
-n_create_time = 
-n_publish_time = 
+; SQL 通知表格
+n_table_name = notifications
+n_id = id
+n_title = title
+n_content = content
+n_start_time = start_time
+n_end_time = end_time
+n_invalid_top_time = invalid_top_time
+n_create_id = create_id
+n_create_user = create_user
+n_create_time = create_time
+n_publish_time = publish_time
 
-# Attachment table
-a_table_name = 
-a_id = 
-a_filename = 
-a_file_location_remote = 
-a_file_location_local = 
+; 附件表格
+a_table_name = attachments
+a_id = id
+a_filename = filename
+a_file_location_remote = file_location_remote
+a_file_location_local = file_location_local
 
-# Relation table
-r_table_name = 
-r_notification_id = 
-r_attachment_id = 
+; 通知和附件的关系表
+r_table_name = relations
+r_notification_id = notification_id
+r_attachment_id = attachment_id
 
-# User table
-u_table_name = 
-u_nickname = 
-u_email = 
-u_password = 
-u_created_at = 
-u_receive_noti = 
+# 用户表
+u_id = id
+u_table_name = users
+u_nickname = nickname
+u_email = email
+u_password = password
+u_created_at = created_at
+u_receive_noti = receive_noti
 
-# Login log table
-l_table_name = 
-l_user_id = 
-l_ip_address = 
-l_login_at = 
+# 登录日志表
+l_table_name = login_logs
+l_user_id = user_id
+l_ip_address = ip_address
+l_login_at = login_at
 
 [Storage]
-attachment_path = ./data # 附件文件存储的位置
-img_path = ./data/background
+attachment_path = ./1dot  ; 腾讯 COS 中的云目录名
+img_path = ./data/background  ; 本地背景图片文件夹
 
-# 使用代理来转发请求，如果不需要，不用填写这个字段
-# 并把所有网络请求的 proxies=xxx 删除
-# 文件开头的代理配置部分也要删除
 [Proxy]
-http = socks5h://...
-https = socks5h://...
+; deprecated
+; 一般不需要代理
+http = socks5h://localhost:9527
+https = socks5h://localhost:9527
 
 [RSA]
-private_key_path = 
-public_key_path = 
+; RSA 加密的密钥路径
+private_key_path = keys/web_login_pri.pem
+public_key_path = keys/web_login_pub.pem
 
 [AES]
 key = 
 iv = 
 
 [JWT]
+; jwt 用来进行访问控制
 secret_key = 
 
 [Email]
-smtp_server = 
-smtp_port = 
-smtp_username = 
+; 通知邮件相关
+smtp_server = smtpdm.aliyun.com
+smtp_port = 465
+smtp_username = cirno@xialing.icu
 smtp_password = 
-smtp_username_batch = 
+smtp_username_batch = notify@xialing.icu
 smtp_password_batch = 
 
 [Session]
+; session 在后端保存验证码等信息
+secret_key =
+
+[Flag]
+; 是否发送邮件、是否使用代理
+send_email = 1
+use_proxy = 0
+
+[IMAP]
+; 接收邮件相关，涉及到 fetchNewEvents 脚本
+qq_emailaddr = 
+qq_grantcode = 
+server_domain = imap.qq.com
+server_port = 993
+
+[QCloud]
+; Tencent COS
+region = ap-tokyo 
+secret_id = 
 secret_key = 
+bucket_name =  
+domain = static.xialing.icu
 ```
 
 在本文件夹下新建一个 `config.ini`，把学号和密码替换为自己的，即可实现登录功能。
 
-## 依赖版本
+## 依赖
 
-pip 版本是 23.1.2，升级之后可能有问题，导入包会失效..玄学
-
-Package     |           Version | 手动 pip 安装? |
--------------|------------------- | -------- |
-argon2-cffi | 23.1.0 | ✅ |
-argon2-cffi-bindings | 21.2.0 | |
-blinker | 1.9.0 | |
-cachelib | 0.13.0 | |
-certifi | 2024.12.14 | |
-cffi | 1.17.1 | |
-charset-normalizer | 3.4.1 | |
-click | 8.1.8 | |
-colorama | 0.4.6 | |
-configparser | 7.1.0 | ✅ |
-Flask | 3.1.0 | ✅ |
-Flask-Cors | 5.0.0 | ✅ |
-Flask-JWT-Extended | 4.7.1 | ✅ |
-Flask-Mail | 0.10.0 | ✅ |
-Flask-Session | 0.8.0 | ✅ |
-idna | 3.10 | |
-itsdangerous | 2.2.0 | |
-Jinja2 | 3.1.5 | |
-MarkupSafe | 3.0.2 | |
-msgspec | 0.19.0 | |
-mysql-connector-python | 9.1.0 | ✅ |
-pip | 23.1.2 | |
-pycparser | 2.22 | |
-pycryptodome | 3.21.0 | ✅ |
-PyJWT | 2.10.1 | |
-PySocks | 1.7.1 | ✅ |
-pytz | 2024.2 | ✅ |
-redis | 5.2.1 | ✅ |
-requests | 2.32.3 | ✅ |
-setuptools | 65.5.0 | |
-urllib3 | 2.3.0 | |
-Werkzeug | 3.1.3 | |
+参见 `requirements.txt`。
 
 ## api
 

@@ -30,7 +30,7 @@ MYCOS = CosUpload()
 
 # ----- 配置 ----- #
 
-PRODUCTION = False # 是否为生产环境
+PRODUCTION = True # 是否为生产环境
 
 # 读取配置文件
 
