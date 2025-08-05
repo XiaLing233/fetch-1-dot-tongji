@@ -9,3 +9,6 @@ keys/
 
 # 测试代码
 private/
+testconfig.py
+
+*.log
