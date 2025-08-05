@@ -13,7 +13,7 @@ configparser==7.1.0
 cos_python_sdk_v5==1.9.36
 crcmod==1.7
 Flask==3.1.1
-Flask-Cors==5.0.0
+Flask-Cors==6.0.0
 Flask-JWT-Extended==4.7.1
 Flask-Mail==0.10.0
 Flask-Session==0.8.0
