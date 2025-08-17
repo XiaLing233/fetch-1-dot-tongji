@@ -442,7 +442,10 @@ def processEvents(session, events):
 
             # 发送邮件
             if SEND_EMAIL:
-                sendNotiEmail(event)
+                try:
+                    sendNotiEmail(event)
+                except Exception as e:
+                    print(f"发送邮件失败：{e}")  # 有可能是配置错误，也可能是邮件内容被学校服务器屏蔽了
             else:
                 time.sleep(10) # 模拟发送邮件
                 print("邮件发送成功！(模拟)")
