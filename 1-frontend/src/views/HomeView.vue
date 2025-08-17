@@ -7,6 +7,7 @@
             style="margin-top: 20px"
             @click="beginTour = true"
             @close.stop="handleClose"
+            v-if="wantBeginTour()"
             closable
             :show-icon="true" />
         </div>
@@ -347,7 +348,10 @@
                 this.pagi.total = this.tempTableData.length
             },
             handleClose() {
-                ;
+                localStorage.setItem('hadTourBefore', 'true')
+            },
+            wantBeginTour() {
+                return this.$store.state.isLoggedin && localStorage.getItem('hadTourBefore') !== 'true'
             }
         },
         computed: {
