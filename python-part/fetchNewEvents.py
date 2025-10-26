@@ -373,6 +373,7 @@ def handleDownloadfile(session, attachment):
     # return localFilePath.replace(STORE_PATH + "/", "") # 返回相对路径
 
     cosFilePath = f"{STORE_PATH}/{attachment['fileLacation'].split('/')[-1]}"
+    print(cosFilePath)
 
     MYCOS.upload_from_bytes(content=response.content, object_key=cosFilePath)
 
