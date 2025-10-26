@@ -383,6 +383,13 @@ def register():
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
         }), 400
 
+    # 检查邮箱是否和发送验证码时的一致
+    if session.get('email') != xl_email:
+        return jsonify({
+            'code': 400,
+            'msg': '邮箱与发送验证码时不一致'
+        }), 400
+
     # 检查用户名是否存在
     if tjSql.sqlUserExist(xl_email):
         return jsonify({
@@ -546,6 +553,13 @@ def recovery():
         return jsonify({
             'code': 400,
             'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
+        }), 400
+
+    # 检查邮箱是否和发送验证码时的一致
+    if session.get('email') != xl_email:
+        return jsonify({
+            'code': 400,
+            'msg': '邮箱与发送验证码时不一致'
         }), 400
 
     # 检查用户名是否存在
