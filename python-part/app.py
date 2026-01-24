@@ -250,34 +250,59 @@ def sendVerificationEmail():
             'msg': '用户已注册，请登录'
         }), 400
     
-    # 检查发送频率限制
-    current_time = time.time()
-    last_send_time = session.get('send_time', 0)
-    last_email = session.get('email', '')
-
-     # 如果是同一个邮箱且未超过5分钟，则拒绝请求
-    if last_email == xl_email and (current_time - last_send_time) < 300:  # 300秒 = 5分钟
+    # 使用 Redis 锁防止并发请求
+    redis_client = app.config['SESSION_REDIS']
+    lock_key = f'email_lock:{xl_email}'
+    lock_value = str(time.time())
+    
+    # 尝试获取锁，锁的过期时间为 10 秒（防止死锁）
+    lock_acquired = redis_client.set(lock_key, lock_value, nx=True, ex=10)
+    
+    if not lock_acquired:
         return jsonify({
             'code': 429,
-            'msg': '已经发送过验证码，请及时查收，请格外留意垃圾邮件(邮箱地址正确了吗？)'
+            'msg': '请求过于频繁，请稍后再试'
         }), 429
+    
+    try:
+        # 检查发送频率限制（使用 Redis 直接检查，而不是 session）
+        rate_limit_key = f'email_rate_limit:{xl_email}'
+        last_send_time = redis_client.get(rate_limit_key)
+        
+        if last_send_time:
+            last_send_time = float(last_send_time)
+            current_time = time.time()
+            # 如果未超过5分钟，则拒绝请求
+            if (current_time - last_send_time) < 300:  # 300秒 = 5分钟
+                return jsonify({
+                    'code': 429,
+                    'msg': '已经发送过验证码，请及时查收，请格外留意垃圾邮件(邮箱地址正确了吗？)'
+                }), 429
 
-    # 生成验证码
-    token = generateVerificationCode()
+        # 生成验证码
+        token = generateVerificationCode()
 
-    # redis 中保存验证码
-    session['verification_code'] = token
-    session['email'] = xl_email
-    session['send_time'] = time.time()
-    session['tried_times'] = 0
+        # session 中保存验证码
+        session['verification_code'] = token
+        session['email'] = xl_email
+        session['send_time'] = time.time()
+        session['tried_times'] = 0
+        
+        # 在 Redis 中记录发送时间（用于频率限制，过期时间 5 分钟）
+        redis_client.setex(rate_limit_key, 300, str(time.time()))
 
-    # 发送邮件
-    sendEmailVerification(xl_email, token)
+        # 发送邮件
+        print("[DEBUG] 发送邮件！")
+        sendEmailVerification(xl_email, token)
 
-    return jsonify({
-        'code': 200,
-        'msg': '发送成功'
-    }), 200
+        return jsonify({
+            'code': 200,
+            'msg': '发送成功'
+        }), 200
+    
+    finally:
+        # 释放锁
+        redis_client.delete(lock_key)
 
 
 # 找回密码邮件发送
@@ -315,34 +340,58 @@ def sendRecoveryEmail():
             'msg': '用户不存在，请移步注册页面'
         }), 400
 
-    # 检查发送频率限制
-    current_time = time.time()
-    last_send_time = session.get('send_time', 0)
-    last_email = session.get('email', '')
-
-     # 如果是同一个邮箱且未超过5分钟，则拒绝请求
-    if last_email == xl_email and (current_time - last_send_time) < 300:  # 300秒 = 5分钟
+    # 使用 Redis 锁防止并发请求
+    redis_client = app.config['SESSION_REDIS']
+    lock_key = f'email_lock:{xl_email}'
+    lock_value = str(time.time())
+    
+    # 尝试获取锁，锁的过期时间为 10 秒（防止死锁）
+    lock_acquired = redis_client.set(lock_key, lock_value, nx=True, ex=10)
+    
+    if not lock_acquired:
         return jsonify({
             'code': 429,
-            'msg': '已经发送过验证码，请及时查收，请格外留意垃圾邮件(邮箱地址正确了吗？)'
+            'msg': '请求过于频繁，请稍后再试'
         }), 429
     
-    # 生成验证码
-    token = generateVerificationCode()
+    try:
+        # 检查发送频率限制（使用 Redis 直接检查，而不是 session）
+        rate_limit_key = f'email_rate_limit:{xl_email}'
+        last_send_time = redis_client.get(rate_limit_key)
+        
+        if last_send_time:
+            last_send_time = float(last_send_time)
+            current_time = time.time()
+            # 如果未超过5分钟，则拒绝请求
+            if (current_time - last_send_time) < 300:  # 300秒 = 5分钟
+                return jsonify({
+                    'code': 429,
+                    'msg': '已经发送过验证码，请及时查收，请格外留意垃圾邮件(邮箱地址正确了吗？)'
+                }), 429
+        
+        # 生成验证码
+        token = generateVerificationCode()
 
-    # session 中保存验证码
-    session['verification_code'] = token
-    session['email'] = xl_email
-    session['send_time'] = time.time() # 发送时间
-    session['tried_times'] = 0
+        # session 中保存验证码
+        session['verification_code'] = token
+        session['email'] = xl_email
+        session['send_time'] = time.time() # 发送时间
+        session['tried_times'] = 0
+        
+        # 在 Redis 中记录发送时间（用于频率限制，过期时间 5 分钟）
+        redis_client.setex(rate_limit_key, 300, str(time.time()))
 
-    # 发送邮件
-    sendEmailFindPassword(xl_email, token)
+        # 发送邮件
+        sendEmailFindPassword(xl_email, token)
 
-    return jsonify({
-        'code': 200,
-        'msg': '发送成功'
-    }), 200
+        return jsonify({
+            'code': 200,
+            'msg': '发送成功'
+        }), 200
+    
+    finally:
+        # 释放锁
+        redis_client.delete(lock_key)
 
 
 
