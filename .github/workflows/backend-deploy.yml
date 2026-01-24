@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master ]
     paths:
-      - "python-part/*"
+      - "python-part/**"
   workflow_dispatch:
 
 jobs:
