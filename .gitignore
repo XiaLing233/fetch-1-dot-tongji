@@ -6,7 +6,7 @@ node_modules
 
 keys/
 # encrypt logic
-1-frontend/src/utils/xl_encrypt.js
+# 1-frontend/src/utils/xl_encrypt.js
 
 # 测试代码
 private/
