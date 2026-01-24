@@ -39,12 +39,12 @@
                     <el-form-item label="验证码" prop="xl_veri_code">
                         <el-input v-model="form.xl_veri_code">
                         <template #append>
-                            <el-button type="primary" :id="emailCounter === 0 ? 'veribtn' : ''" @click="sendRecoveryEmail(ruleFormRef)" :disabled="emailCounter !== 0">{{ emailCounter === 0 ? '发送验证码' : `已发送(${emailCounter}s)` }}</el-button>
+                            <el-button type="primary" :id="emailCounter === 0 ? 'veribtn' : ''" @click="sendRecoveryEmail(ruleFormRef)" :disabled="emailCounter !== 0" :loading="sendingEmail">{{ emailCounter === 0 ? '发送验证码' : `已发送(${emailCounter}s)` }}</el-button>
                         </template>
                         </el-input>
                     </el-form-item>
                     <el-form-item style="padding: 10px 0 0 0;">
-                        <el-button type="primary" @click="recovery" style="width: 400px">找回密码</el-button>
+                        <el-button type="primary" @click="recovery" style="width: 400px" :loading="recovering">找回密码</el-button>
                     </el-form-item>
                     </el-form>
                     <el-button link type="primary" @click="this.$router.push('/login')" style="float: left; margin-left: 80px; margin-bottom: 20px">返回登录界面</el-button>
@@ -72,6 +72,8 @@ export default {
             emailCounter: 0,
             openDialog: false,
             backgroundPic: '', // base64 encoded image
+            sendingEmail: false,
+            recovering: false,
             rules: {
             xl_email: [
                 { required: true, message: '请输入邮箱地址', trigger: 'blur' },
@@ -106,6 +108,7 @@ export default {
 
             await formEl.validate((valid) => {
                 if (valid) {
+                    this.recovering = true;
                     axios({
                         method: 'post',
                         url: '/api/recovery',
@@ -130,6 +133,9 @@ export default {
                             message: error.response.data.msg,
                             type: 'error'
                         })
+                    })
+                    .finally(() => {
+                        this.recovering = false;
                     })
                 }
             })
@@ -161,6 +167,7 @@ export default {
             if (!formEl) return;
             formEl.validateField(["xl_email", "xl_password", "xl_password_confirm"], (valid) => {
                 if (valid) {
+                    this.sendingEmail = true;
                     axios({
                         method: 'post',
                         url: '/api/sendRecoveryEmail',
@@ -184,6 +191,9 @@ export default {
                             message: error.response.data.msg,
                             type: 'error'
                         })
+                    })
+                    .finally(() => {
+                        this.sendingEmail = false;
                     })
                 }
             })

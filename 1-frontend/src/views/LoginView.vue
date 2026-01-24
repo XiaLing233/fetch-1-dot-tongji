@@ -34,7 +34,7 @@
                     <el-input type="password" v-model="form.xl_password" show-password></el-input>
                 </el-form-item>
                 <el-form-item style="padding: 10px 0 0 0;">
-                    <el-button type="primary" @click="login" style="width: 400px">登录</el-button>
+                    <el-button type="primary" @click="login" style="width: 400px" :loading="loggingIn">登录</el-button>
                 </el-form-item>
                 </el-form>
                 <el-button link type="primary" @click="this.$router.push('/recovery')" style="float: left; margin-left: 80px; margin-bottom: 10px">忘记了密码？</el-button>
@@ -67,6 +67,7 @@ export default {
             },
             backgroundPic: '', // base64 encoded image
             openDialog: false,
+            loggingIn: false,
             rules: {
             xl_email: [
                 { required: true, message: '请输入邮箱地址', trigger: 'blur' },
@@ -87,6 +88,7 @@ export default {
             const valid = await formEl.validate();
             if (!valid) return;
 
+            this.loggingIn = true;
             try {
                 await axios({
                     method: 'post',
@@ -111,6 +113,8 @@ export default {
                     message: error.response.data.msg,
                     type: 'error'
                 })
+            } finally {
+                this.loggingIn = false;
             }
         },
         async getUserInfo() {
