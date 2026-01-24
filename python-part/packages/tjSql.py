@@ -25,54 +25,6 @@ DB_CONFIG = {
     'charset': DB_CHARSET
 }
 
-# 表格结构读取
-
-# 读取通知表格结构
-
-N_TABLE_NAME = CONFIG['Table']['n_table_name']
-N_ID = CONFIG['Table']['n_id']
-N_TITLE = CONFIG['Table']['n_title']
-N_CONTENT = CONFIG['Table']['n_content']
-N_START_TIME = CONFIG['Table']['n_start_time']
-N_END_TIME = CONFIG['Table']['n_end_time']
-N_INVALID_TOP_TIME = CONFIG['Table']['n_invalid_top_time']
-N_CREATE_ID = CONFIG['Table']['n_create_id']
-N_CREATE_USER = CONFIG['Table']['n_create_user']
-N_CREATE_TIME = CONFIG['Table']['n_create_time']
-N_PUBLISH_TIME = CONFIG['Table']['n_publish_time']
-
-# 读取附件表格结构
-
-A_TABLE_NAME = CONFIG['Table']['a_table_name']
-A_ID = CONFIG['Table']['a_id']
-A_FILENAME = CONFIG['Table']['a_filename']
-A_FILE_LOCATION_REMOTE = CONFIG['Table']['a_file_location_remote']
-A_FILE_LOCATION_LOCAL = CONFIG['Table']['a_file_location_local']
-
-# 读取关系表格结构
-
-R_TABLE_NAME = CONFIG['Table']['r_table_name']
-# R_ID = CONFIG['Table']['r_id'] # 关系表格的主键是自增的，不需要传入
-R_NOTIFICATION_ID = CONFIG['Table']['r_notification_id']
-R_ATTACHMENT_ID = CONFIG['Table']['r_attachment_id']
-
-# 读取用户表格结构
-
-U_TABLE_NAME = CONFIG['Table']['u_table_name']
-U_ID = CONFIG['Table']['u_id']
-U_NICKNAME = CONFIG['Table']['u_nickname']
-U_EMAIL = CONFIG['Table']['u_email']
-U_PASSWORD = CONFIG['Table']['u_password']
-U_CREATED_AT = CONFIG['Table']['u_created_at']
-U_RECEIVE_NOTI = CONFIG['Table']['u_receive_noti']
-
-# 读取登录日志表格结构
-
-L_TABLE_NAME = CONFIG['Table']['l_table_name']
-# L_ID = CONFIG['Table']['l_id']
-L_USER_ID = CONFIG['Table']['l_user_id']
-L_IP_ADDRESS = CONFIG['Table']['l_ip_address']
-L_LOGIN_AT = CONFIG['Table']['l_login_at']
 
 # ----- 数据更新部分 ----- #
 def sqlUpdateNotification(notification):
@@ -84,11 +36,11 @@ def sqlUpdateNotification(notification):
 
     # 插入通知
     sql = (
-        f" UPDATE {N_TABLE_NAME} SET"
-        f" {N_TITLE} = %s, {N_CONTENT} = %s, {N_START_TIME} = %s, "
-        f" {N_END_TIME} = %s, {N_INVALID_TOP_TIME} = %s, {N_CREATE_ID} = %s, "
-        f" {N_CREATE_USER} = %s, {N_CREATE_TIME} = %s, {N_PUBLISH_TIME} = %s"
-        f" WHERE {N_ID} = %s"
+        " UPDATE notifications SET"
+        " title = %s, content = %s, start_time = %s, "
+        " end_time = %s, invalid_top_time = %s, create_id = %s, "
+        " create_user = %s, create_time = %s, publish_time = %s"
+        " WHERE id = %s"
     )
 
     print("执行的 SQL 语句是：", sql)
@@ -115,11 +67,11 @@ def sqlInsertNotification(notification):
 
     # 插入通知
     sql = (
-        f"INSERT INTO {N_TABLE_NAME} "
-        f"({N_ID}, {N_TITLE}, {N_CONTENT}, {N_START_TIME}, "
-        f"{N_END_TIME}, {N_INVALID_TOP_TIME}, {N_CREATE_ID}, "
-        f"{N_CREATE_USER}, {N_CREATE_TIME}, {N_PUBLISH_TIME}) "
-        f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        "INSERT INTO notifications "
+        "(id, title, content, start_time, "
+        "end_time, invalid_top_time, create_id, "
+        "create_user, create_time, publish_time) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
     )
 
     print("执行的 SQL 语句是：", sql)
@@ -142,9 +94,9 @@ def sqlInsertAttachment(attachment, localFilePath):
 
     # 插入附件
     sql = (
-        f"INSERT INTO {A_TABLE_NAME} "
-        f"({A_ID}, {A_FILENAME}, {A_FILE_LOCATION_REMOTE}, {A_FILE_LOCATION_LOCAL}) "
-        f"VALUES (%s, %s, %s, %s)"
+        "INSERT INTO attachments "
+        "(id, filename, file_location_remote, file_location_local) "
+        "VALUES (%s, %s, %s, %s)"
     )
     
     print("执行的 SQL 语句是：", sql)
@@ -164,9 +116,9 @@ def sqlInsertRelation(notification_id, attachment_id):
 
     # 插入关系
     sql = (
-        f"INSERT INTO {R_TABLE_NAME} "
-        f"({R_NOTIFICATION_ID}, {R_ATTACHMENT_ID}) "
-        f"VALUES (%s, %s)"
+        "INSERT INTO relations "
+        "(notification_id, attachment_id) "
+        "VALUES (%s, %s)"
     )
 
     print("执行的 SQL 语句是：", sql)
@@ -186,7 +138,7 @@ def sqlHaveRecorded(notification_id):
     cursor = conn.cursor()
 
     # 查询通知
-    sql = f"SELECT * FROM {N_TABLE_NAME} WHERE {N_ID} = %s"
+    sql = "SELECT * FROM notifications WHERE id = %s"
     
     print("执行的 SQL 语句是：", sql)
 
@@ -212,11 +164,11 @@ def sqlFindMyCommonMsgTop():
 
     # 查询通知，除了内容之外的所有列
     sql = (
-        f"SELECT {N_ID}, {N_TITLE}, {N_START_TIME}, {N_END_TIME}, "
-        f"{N_INVALID_TOP_TIME}, {N_CREATE_ID}, {N_CREATE_USER}, "
-        f"{N_CREATE_TIME}, {N_PUBLISH_TIME} FROM {N_TABLE_NAME} "
-        f"WHERE {N_INVALID_TOP_TIME} > %s"
-        f"ORDER BY {N_PUBLISH_TIME} DESC"
+        "SELECT id, title, start_time, end_time, "
+        "invalid_top_time, create_id, create_user, "
+        "create_time, publish_time FROM notifications "
+        "WHERE invalid_top_time > %s"
+        "ORDER BY publish_time DESC"
     )
 
     print("执行的 SQL 语句是：", sql)
@@ -249,12 +201,12 @@ def sqlFindMyCommonMsgPublish():
 
     # 再查询未置顶的
     sql = (
-        f"SELECT {N_ID}, {N_TITLE}, {N_START_TIME}, {N_END_TIME}, "
-        f"{N_INVALID_TOP_TIME}, {N_CREATE_ID}, {N_CREATE_USER}, "
-        f"{N_CREATE_TIME}, {N_PUBLISH_TIME} FROM {N_TABLE_NAME} "
-        f"WHERE {N_INVALID_TOP_TIME} <= %s "
-        f"OR {N_INVALID_TOP_TIME} IS NULL "
-        f"ORDER BY {N_PUBLISH_TIME} DESC" # 按照发布时间倒序排列，最新的在前
+        "SELECT id, title, start_time, end_time, "
+        "invalid_top_time, create_id, create_user, "
+        "create_time, publish_time FROM notifications "
+        "WHERE invalid_top_time <= %s "
+        "OR invalid_top_time IS NULL "
+        "ORDER BY publish_time DESC" # 按照发布时间倒序排列，最新的在前
     )
     
     print("执行的 SQL 语句是：", sql)
@@ -266,21 +218,21 @@ def sqlFindMyCommonMsgPublish():
 
     # 把时间列转换为中文格式
     for item in result:
-        item[N_START_TIME] = item[N_START_TIME].strftime("%Y-%m-%d %H:%M:%S")
-        item[N_END_TIME] = item[N_END_TIME].strftime("%Y-%m-%d %H:%M:%S")
-        item[N_CREATE_TIME] = item[N_CREATE_TIME].strftime("%Y-%m-%d %H:%M:%S")
-        item[N_PUBLISH_TIME] = item[N_PUBLISH_TIME].strftime("%Y-%m-%d %H:%M:%S")
-        if item[N_INVALID_TOP_TIME] != None:
-            item[N_INVALID_TOP_TIME] = item[N_INVALID_TOP_TIME].strftime("%Y-%m-%d %H:%M:%S")
+        item['start_time'] = item['start_time'].strftime("%Y-%m-%d %H:%M:%S")
+        item['end_time'] = item['end_time'].strftime("%Y-%m-%d %H:%M:%S")
+        item['create_time'] = item['create_time'].strftime("%Y-%m-%d %H:%M:%S")
+        item['publish_time'] = item['publish_time'].strftime("%Y-%m-%d %H:%M:%S")
+        if item['invalid_top_time'] != None:
+            item['invalid_top_time'] = item['invalid_top_time'].strftime("%Y-%m-%d %H:%M:%S")
 
     # 增加一列表示状态
     for item in result:
-        if item[N_END_TIME] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
+        if item['end_time'] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
             item['status'] = "发布中"
         else:
             item['status'] = "已过期"
         
-        if item[N_INVALID_TOP_TIME] != None and item[N_INVALID_TOP_TIME] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
+        if item['invalid_top_time'] != None and item['invalid_top_time'] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
             item['status'] = "置顶"
     
     print("查询到的通知数量是：", len(result))
@@ -297,9 +249,13 @@ def sqlFindAttachmentByNotificationId(notification_id):
     cursor = conn.cursor()
 
     # 查询关系表，找到关联的附件
+    # 如果多个附件具有相同的 file_location_remote，只返回 id 更大的
     sql = (
-        f"SELECT { R_ATTACHMENT_ID } FROM {R_TABLE_NAME} "
-        f"WHERE {R_NOTIFICATION_ID} = %s"
+        "SELECT MAX(r.attachment_id) as attachment_id "
+        "FROM relations r "
+        "JOIN attachments a ON r.attachment_id = a.id "
+        "WHERE r.notification_id = %s "
+        "GROUP BY a.file_location_remote"
     )
 
     print("执行的 SQL 语句是：", sql)
@@ -324,7 +280,7 @@ def sqlFindAttachmentById(attachment_id):
 
     # 查询附件表，找到附件的信息
     sql = (
-        f"SELECT * FROM {A_TABLE_NAME} WHERE {A_ID} = %s"
+        "SELECT * FROM attachments WHERE id = %s"
     )
 
     print(attachment_id)
@@ -349,7 +305,7 @@ def sqlFindMyCommonMsgPublishById(notification_id):
 
     # 查询通知，返回所有列
     sql = (
-        f"SELECT * FROM {N_TABLE_NAME} WHERE {N_ID} = %s"
+        "SELECT * FROM notifications WHERE id = %s"
     )
 
     print("执行的 SQL 语句是：", sql)
@@ -369,12 +325,12 @@ def sqlFindMyCommonMsgPublishById(notification_id):
         attachment_info = sqlFindAttachmentById(attachment[0])
         # 只保留 id 和 fileName
         attachment_info = {
-            f'{ A_FILENAME }': attachment_info[0][1],
-            f'{ A_FILE_LOCATION_LOCAL }': attachment_info[0][3]
+            'filename': attachment_info[0][1],
+            'file_location_local': attachment_info[0][3]
         }
 
         # 判断附件的类型，新建 fileType 字段
-        filename = attachment_info[A_FILENAME]
+        filename = attachment_info['filename']
         if ".doc" in filename:
             attachment_info['fileType'] = "doc"
         elif ".xls" in filename:
@@ -397,16 +353,16 @@ def sqlFindMyCommonMsgPublishById(notification_id):
 
     # 把通知和附件信息合并
     notification_data = {
-        f"{ N_ID }": result[0][0],
-        f"{ N_TITLE }": result[0][1],
-        f"{ N_CONTENT }": result[0][2],
-        f"{ N_START_TIME }": result[0][3].strftime("%Y-%m-%d %H:%M:%S"),
-        f"{ N_END_TIME }": result[0][4].strftime("%Y-%m-%d %H:%M:%S"),
-        f"{ N_INVALID_TOP_TIME }": invalid_top_time,
-        f"{ N_CREATE_ID }": result[0][6],
-        f"{ N_CREATE_USER }": result[0][7],
-        f"{ N_CREATE_TIME }": result[0][8].strftime("%Y-%m-%d %H:%M:%S"),
-        f"{ N_PUBLISH_TIME }": result[0][9].strftime("%Y-%m-%d %H:%M:%S"),
+        'id': result[0][0],
+        'title': result[0][1],
+        'content': result[0][2],
+        'start_time': result[0][3].strftime("%Y-%m-%d %H:%M:%S"),
+        'end_time': result[0][4].strftime("%Y-%m-%d %H:%M:%S"),
+        'invalid_top_time': invalid_top_time,
+        'create_id': result[0][6],
+        'create_user': result[0][7],
+        'create_time': result[0][8].strftime("%Y-%m-%d %H:%M:%S"),
+        'publish_time': result[0][9].strftime("%Y-%m-%d %H:%M:%S"),
         'attachments': attachment_list
     }
     
@@ -424,7 +380,7 @@ def sqlUserExist(email):
     cursor = conn.cursor()
 
     # 查询用户
-    sql = f"SELECT * FROM {U_TABLE_NAME} WHERE {U_EMAIL} = %s"
+    sql = "SELECT * FROM users WHERE email = %s"
 
     print("执行的 SQL 语句是：", sql)
 
@@ -451,9 +407,9 @@ def sqlInsertUser(userName, email, password, created_at):
 
     # 插入用户
     sql = (
-        f"INSERT INTO {U_TABLE_NAME} "
-        f"({U_NICKNAME}, {U_EMAIL}, {U_PASSWORD}, {U_CREATED_AT}) "
-        f"VALUES (%s, %s, %s, %s)"
+        "INSERT INTO users "
+        "(nickname, email, password, created_at) "
+        "VALUES (%s, %s, %s, %s)"
     )
 
     print("执行的 SQL 语句是：", sql)
@@ -478,7 +434,7 @@ def sqlGetPassword(email):
     cursor = conn.cursor()
 
     # 查询用户的密码
-    sql = f"SELECT {U_PASSWORD} FROM {U_TABLE_NAME} WHERE {U_EMAIL} = %s"
+    sql = "SELECT password FROM users WHERE email = %s"
 
     print("执行的 SQL 语句是：", sql)
 
@@ -503,7 +459,7 @@ def sqlUpdatePassword(email, newPassword):
     cursor = conn.cursor()
 
     # 更新用户的密码
-    sql = f"UPDATE {U_TABLE_NAME} SET {U_PASSWORD} = %s WHERE {U_EMAIL} = %s"
+    sql = "UPDATE users SET password = %s WHERE email = %s"
 
     print("执行的 SQL 语句是：", sql)
 
@@ -528,7 +484,7 @@ def sqlGetUserInfo(email):
     print("查询的用户邮箱是：", email)
 
     # 查询用户的信息
-    sql = f"SELECT {U_NICKNAME}, {U_EMAIL}, { U_CREATED_AT }, { U_RECEIVE_NOTI } FROM {U_TABLE_NAME} WHERE {U_EMAIL} = %s"
+    sql = "SELECT nickname, email, created_at, receive_noti FROM users WHERE email = %s"
 
     print("执行的 SQL 语句是：", sql)
 
@@ -552,8 +508,8 @@ def sqltoggleReceiveNoti(email, option):
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
-    # 更新用户的密码
-    sql = f"UPDATE {U_TABLE_NAME} SET {U_RECEIVE_NOTI} = %s WHERE {U_EMAIL} = %s"
+    # 更新用户的接收通知选项
+    sql = "UPDATE users SET receive_noti = %s WHERE email = %s"
 
     print("执行的 SQL 语句是：", sql)
 
@@ -576,7 +532,7 @@ def sqlGetAllReceiveNotiUser():
     cursor = conn.cursor()
 
     # 查询用户的邮箱
-    sql = f"SELECT { U_NICKNAME }, {U_EMAIL} FROM {U_TABLE_NAME} WHERE {U_RECEIVE_NOTI} = 1"
+    sql = "SELECT nickname, email FROM users WHERE receive_noti = 1"
 
     print("执行的 SQL 语句是：", sql)
 
@@ -600,7 +556,7 @@ def sqlGetUserIdByEmail(email):
     cursor = conn.cursor()
 
     # 查询用户的 ID
-    sql = f"SELECT { U_ID } FROM {U_TABLE_NAME} WHERE {U_EMAIL} = %s"
+    sql = "SELECT id FROM users WHERE email = %s"
 
     print("执行的 SQL 语句是：", sql)
 
@@ -627,9 +583,9 @@ def sqlUpdateLoginLog(email, ip_address, login_at):
 
     # 插入登录记录
     sql = (
-        f"INSERT INTO {L_TABLE_NAME} "
-        f"({L_USER_ID}, {L_IP_ADDRESS}, {L_LOGIN_AT}) "
-        f"VALUES (%s, %s, %s)"
+        "INSERT INTO login_logs "
+        "(user_id, ip_address, login_at) "
+        "VALUES (%s, %s, %s)"
     )
 
     print("执行的 SQL 语句是：", sql)
@@ -656,7 +612,7 @@ def sqlGetLoginLog(email):
     user_id = sqlGetUserIdByEmail(email)
 
     # 查询登录记录
-    sql = f"SELECT { L_IP_ADDRESS }, { L_LOGIN_AT } FROM {L_TABLE_NAME} WHERE {L_USER_ID} = %s ORDER BY {L_LOGIN_AT} DESC LIMIT 10"
+    sql = "SELECT ip_address, login_at FROM login_logs WHERE user_id = %s ORDER BY login_at DESC LIMIT 10"
 
     print("执行的 SQL 语句是：", sql)
 
