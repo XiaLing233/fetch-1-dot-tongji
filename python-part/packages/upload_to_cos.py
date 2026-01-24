@@ -14,11 +14,13 @@ class CosUpload():
         region = CONFIG["QCloud"]["region"]
         secret_id = CONFIG["QCloud"]["secret_id"]
         secret_key = CONFIG["QCloud"]["secret_key"]
+        domain = CONFIG["QCloud"]["domain"]
         self.bucket_name = CONFIG["QCloud"]["bucket_name"]
 
         config = CosConfig(Region=region, 
                            SecretId=secret_id, 
-                           SecretKey=secret_key
+                           SecretKey=secret_key,
+                           Domain=domain
                            )
         
         self.client = CosS3Client(config)
