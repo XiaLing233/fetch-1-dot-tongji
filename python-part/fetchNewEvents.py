@@ -61,9 +61,6 @@ IMAP_PORT = CONFIG["IMAP"]["server_port"]
 IMAP_USERNAME =  CONFIG["IMAP"]["qq_emailaddr"]
 IMAP_PASSWORD =  CONFIG["IMAP"]["qq_grantcode"]
 
-U_NICKNAME = CONFIG['Table']['u_nickname']
-U_EMAIL = CONFIG['Table']['u_email']
-
 def debug_response(step, response):
     print("第", step, "步：\n")
     print("状态码：", response.status_code, "\n")
@@ -390,12 +387,12 @@ def sendNotiEmail(event):
     for to in to_list:
         msg = MIMEMultipart()
         msg['From'] = formataddr(["琪露诺bot", SMTP_USERNAME])
-        msg['To'] = to[U_EMAIL]
+        msg['To'] = to["email"]
         # 标题带同济大学可能会被拦截，把同济改成TJ
         msg['Subject'] = "1系统发布了新内容：" + event['title']
 
         # 邮件正文，HTML 格式
-        msg.attach(MIMEText(f"尊敬的 {to[U_NICKNAME]}：", 'html'))
+        msg.attach(MIMEText(f"尊敬的 {to["nickname"]}：", 'html'))
         msg.attach(MIMEText(f"<br>通知标题：<b>{event['title']}</b><br>", 'html'))
         msg.attach(MIMEText(event['content'], 'html'))
 
@@ -415,7 +412,7 @@ def sendNotiEmail(event):
         # 发送邮件
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_USERNAME, to[U_EMAIL], msg.as_string())
+            server.sendmail(SMTP_USERNAME, to["email"], msg.as_string())
             print("邮件发送成功！")
             time.sleep(5) # 不要频繁请求
 
