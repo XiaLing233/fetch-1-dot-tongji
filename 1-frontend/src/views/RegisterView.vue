@@ -179,7 +179,10 @@ export default {
                 captcha.show();
             } catch (error) {
                 console.error('验证码加载失败:', error);
-                this.handleCaptchaError();
+                ElMessage({
+                    message: '验证码加载失败，请刷新页面重试',
+                    type: 'error'
+                });
             }
         },
         // 处理验证码回调
@@ -231,19 +234,6 @@ export default {
             .finally(() => {
                 this.sendingEmail = false;
             })
-        },
-        // 处理验证码加载错误
-        handleCaptchaError() {
-            const appid = '190271421';
-            const ticket = 'terror_1001_' + appid + '_' + Math.floor(new Date().getTime() / 1000);
-            const randstr = '@' + Math.random().toString(36).substr(2);
-            
-            ElMessage({
-                message: '验证码加载失败，使用容灾票据',
-                type: 'warning'
-            });
-            
-            this.sendEmailWithCaptcha(ticket, randstr);
         }
     },
     mounted() {
