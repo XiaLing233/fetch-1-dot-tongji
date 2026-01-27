@@ -1,5 +1,5 @@
 <template>
-    <div style="background-color: #f0f0f0; width: 100%; height: auto; margin-top: 20px;">
+    <div style="background-color: #f0f0f0; width: 100%; ; margin-top: 20px;">
         <div v-if="this.$store.state.isLoggedin">
         <el-alert 
             title="初次使用? 点此开始新手引导" 
@@ -12,7 +12,7 @@
             :show-icon="true" />
         </div>
         <el-card
-        style="margin: 20px auto; height: calc(100vh - 140px);"
+        style="margin: 20px auto; min-height: 800px;"
         shadow="never"
     >
     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -33,7 +33,7 @@
         <el-table
             :data="paginatedData"
             style="width: 100%"
-            height="800px"
+            height="600"
             stripe
             border
             @row-click="findMyCommonMsgPublishById"
@@ -174,6 +174,7 @@
                 openAlertDialog: false,
                 openNotiDialog: false,
                 search: '',
+                statusFilter: [], // 存储当前的状态筛选
                 noti: {
                     title: '',
                     content: '',
@@ -339,19 +340,36 @@
             handleFilter(filters) {
                 // console.log(filters)
                 const status = filters['statusColumn'] // 需要在 el-table-column 中设置 column-key 属性才可以，不然传入的是个动态的值，每次刷新可能会变，需要写一个静态的值才好
-                if (status.length === 0) {
-                    this.tempTableData = this.tableData
-                }
-                else {
-                    this.tempTableData = this.tableData.filter(row => status.includes(row.status))
-                }
-                this.pagi.total = this.tempTableData.length
+                this.statusFilter = status // 保存当前的状态筛选
+                this.applyFilters()
             },
             handleClose() {
                 localStorage.setItem('hadTourBefore', 'true')
             },
             wantBeginTour() {
                 return this.$store.state.isLoggedin && localStorage.getItem('hadTourBefore') !== 'true'
+            },
+            handleSearch() {
+                this.applyFilters()
+            },
+            applyFilters() {
+                // 从原始数据开始筛选
+                let filteredData = this.tableData
+                
+                // 应用状态筛选
+                if (this.statusFilter.length > 0) {
+                    filteredData = filteredData.filter(row => this.statusFilter.includes(row.status))
+                }
+                
+                // 应用搜索筛选
+                if (this.search) {
+                    filteredData = filteredData.filter(row => row.title.includes(this.search))
+                }
+                
+                // 更新显示数据和分页信息
+                this.tempTableData = filteredData
+                this.pagi.total = this.tempTableData.length
+                this.pagi.currentPage = 1
             }
         },
         computed: {
@@ -359,9 +377,6 @@
                 const start = (this.pagi.currentPage - 1) * this.pagi.pageSize
                 const end = start + this.pagi.pageSize
                 return this.tempTableData.slice(start, end)
-            },
-            handleSearch() {
-                this.tempTableData = this.tableData.filter(row => row.title.includes(this.search))
             }
         },
         components: {
