@@ -246,6 +246,8 @@ def getBackgroundImg():
 
 {
     "xl_email": "admin@tongji.edu.cn",
+    "captcha_ticket": "验证码票据",
+    "captcha_randstr": "随机字符串"
 }
 
 
@@ -359,6 +361,8 @@ def sendVerificationEmail():
 
 {
     "xl_email": "admin@tongji.edu.cn",
+    "captcha_ticket": "验证码票据",
+    "captcha_randstr": "随机字符串"
 }
 
 
