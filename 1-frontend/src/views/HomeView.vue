@@ -1,5 +1,5 @@
 <template>
-    <div style="background-color: #f0f0f0; width: 100%; ; margin-top: 20px;">
+    <div style="background-color: #f0f0f0; width: 100%; height: auto; margin-top: 20px;">
         <div v-if="this.$store.state.isLoggedin">
         <el-alert 
             title="初次使用? 点此开始新手引导" 
@@ -12,7 +12,7 @@
             :show-icon="true" />
         </div>
         <el-card
-        style="margin: 20px auto; min-height: 800px;"
+        style="margin: 20px auto; height: calc(100vh - 140px);"
         shadow="never"
     >
     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -33,7 +33,7 @@
         <el-table
             :data="paginatedData"
             style="width: 100%"
-            height="600"
+            height="800px"
             stripe
             border
             @row-click="findMyCommonMsgPublishById"
