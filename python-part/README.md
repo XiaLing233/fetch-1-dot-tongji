@@ -216,7 +216,9 @@ domain = static.xialing.icu
 
 ```json
 {
-    "xl_email": "cirno@tongji.edu.cn",
+    "xl_email": "admin@tongji.edu.cn",
+    "captcha_ticket": "验证码票据",
+    "captcha_randstr": "随机字符串"
 }
 ```
 
@@ -237,7 +239,9 @@ domain = static.xialing.icu
 
 ```json
 {
-    "xl_email": "cirno@tongji.edu.cn",
+    "xl_email": "admin@tongji.edu.cn",
+    "captcha_ticket": "验证码票据",
+    "captcha_randstr": "随机字符串"
 }
 ```
 
@@ -249,6 +253,8 @@ domain = static.xialing.icu
     "msg": "成功",
 }
 ```
+
+> 总是有闲人打我的端口，发邮件没多少钱，但是骚扰到老师或学生就不好了。
 
 ### 以下需要验证 token
 
