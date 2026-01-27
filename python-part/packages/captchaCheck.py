@@ -73,7 +73,7 @@ class CaptchaChecker:
             }
             req.from_json_string(json.dumps(params))
             
-            # 调用接口验证
+            # 调用接口验证（所有票据都必须通过腾讯API验证）
             resp = self.client.DescribeCaptchaResult(req)
             
             # 解析响应
@@ -84,25 +84,16 @@ class CaptchaChecker:
             captcha_msg = resp_dict.get('CaptchaMsg', '未知错误')
             
             if captcha_code == 1:
+                # 验证成功
                 return True, "验证成功"
             else:
-                # 检查是否是容灾票据（以 terror_ 开头）
-                if ticket.startswith('terror_'):
-                    # 容灾票据，可以通过验证但记录日志
-                    print(f"[WARNING] 使用容灾票据: {ticket}")
-                    return True, "容灾票据验证通过"
-                
+                # 验证失败
                 return False, f"验证失败: {captcha_msg} (Code: {captcha_code})"
                 
         except TencentCloudSDKException as err:
             error_msg = f"验证码SDK异常: {err}"
             print(f"[ERROR] {error_msg}")
-            
-            # 容灾处理：SDK异常时，如果是容灾票据，则放行
-            if ticket.startswith('terror_'):
-                print(f"[WARNING] SDK异常但使用容灾票据，放行")
-                return True, "容灾票据（SDK异常）"
-            
+            # SDK异常时一律拒绝，不放行任何票据（包括容灾票据）
             return False, error_msg
         except Exception as e:
             error_msg = f"验证码验证异常: {str(e)}"
