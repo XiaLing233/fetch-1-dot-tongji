@@ -167,36 +167,85 @@ export default {
             if (!formEl) return;
             formEl.validateField(["xl_email", "xl_password", "xl_password_confirm"], (valid) => {
                 if (valid) {
-                    this.sendingEmail = true;
-                    axios({
-                        method: 'post',
-                        url: '/api/sendRecoveryEmail',
-                        data: {
-                            xl_email: this.form.xl_email + '@tongji.edu.cn'
-                        }
-                    })
-                    .then(response => {
-                        // console.log(response)
-                        this.emailCounter = 60
-                        const timer = setInterval(() => {
-                            this.emailCounter--
-                            if (this.emailCounter === 0) {
-                                clearInterval(timer)
-                            }
-                        }, 1000)
-                    })
-                    .catch(error => {
-                        console.log(error)
-                        ElMessage({
-                            message: error.response.data.msg,
-                            type: 'error'
-                        })
-                    })
-                    .finally(() => {
-                        this.sendingEmail = false;
-                    })
+                    // 先调用腾讯验证码
+                    this.showCaptcha();
                 }
             })
+        },
+        // 显示腾讯验证码
+        showCaptcha() {
+            try {
+                const captcha = new TencentCaptcha('190271421', (res) => {
+                    this.handleCaptchaCallback(res);
+                }, {});
+                captcha.show();
+            } catch (error) {
+                console.error('验证码加载失败:', error);
+                this.handleCaptchaError();
+            }
+        },
+        // 处理验证码回调
+        handleCaptchaCallback(res) {
+            // ret: 0-验证成功, 2-用户关闭验证码
+            if (res.ret === 0) {
+                // 验证成功，发送邮件验证码
+                this.sendEmailWithCaptcha(res.ticket, res.randstr);
+            } else if (res.ret === 2) {
+                ElMessage({
+                    message: '已取消验证',
+                    type: 'info'
+                });
+            }
+        },
+        // 验证码验证成功后，发送邮件
+        sendEmailWithCaptcha(ticket, randstr) {
+            this.sendingEmail = true;
+            axios({
+                method: 'post',
+                url: '/api/sendRecoveryEmail',
+                data: {
+                    xl_email: this.form.xl_email + '@tongji.edu.cn',
+                    captcha_ticket: ticket,
+                    captcha_randstr: randstr
+                }
+            })
+            .then(response => {
+                // console.log(response)
+                this.emailCounter = 60
+                const timer = setInterval(() => {
+                    this.emailCounter--
+                    if (this.emailCounter === 0) {
+                        clearInterval(timer)
+                    }
+                }, 1000)
+                ElMessage({
+                    message: '验证码已发送',
+                    type: 'success'
+                });
+            })
+            .catch(error => {
+                console.log(error)
+                ElMessage({
+                    message: error.response.data.msg,
+                    type: 'error'
+                })
+            })
+            .finally(() => {
+                this.sendingEmail = false;
+            })
+        },
+        // 处理验证码加载错误
+        handleCaptchaError() {
+            const appid = '190271421';
+            const ticket = 'terror_1001_' + appid + '_' + Math.floor(new Date().getTime() / 1000);
+            const randstr = '@' + Math.random().toString(36).substr(2);
+            
+            ElMessage({
+                message: '验证码加载失败，使用容灾票据',
+                type: 'warning'
+            });
+            
+            this.sendEmailWithCaptcha(ticket, randstr);
         }
     },
     mounted() {

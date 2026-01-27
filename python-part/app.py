@@ -6,6 +6,7 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, se
 from flask_mail import Mail, Message
 from flask_session import Session
 from packages import tjSql, myDecrypt
+from packages.captchaCheck import verify_captcha
 
 import configparser
 from argon2 import PasswordHasher
@@ -119,7 +120,7 @@ def sendEmailVerification(recEmail, token):
     如果这不是您的操作，请忽略此邮件。
         
     此致
-    xialing.icu
+    1.xialing.icu
     '''
     
     # 发送邮件
@@ -148,7 +149,7 @@ def sendEmailFindPassword(recEmail, token):
     如果这不是您的操作，请忽略此邮件。
     
     此致
-    xialing.icu
+    1.xialing.icu
     '''
     
     # 发送邮件
@@ -171,11 +172,35 @@ def generateVerificationCode():
 
 # 获取 IP 地址
 def get_client_ip():
-    # 首先检查是否有 X-Forwarded-For 头部
+    """
+    安全地获取客户端真实IP地址
+    优先级：CF-Connecting-IP > X-Real-IP > X-Forwarded-For(最后一个) > remote_addr
+    """
+    # 1. Cloudflare 特定头部（最可信，无法伪造）
+    if 'CF-Connecting-IP' in request.headers:
+        return request.headers.get('CF-Connecting-IP')
+    
+    # 2. X-Real-IP（某些代理使用）
+    if 'X-Real-IP' in request.headers:
+        return request.headers.get('X-Real-IP')
+    
+    # 3. X-Forwarded-For（取最右边的IP，即最后一个代理添加的）
     if 'X-Forwarded-For' in request.headers:
-        # 获取第一个 IP 地址（有可能是代理链中的第一个）
-        return request.headers.getlist('X-Forwarded-For')[0].split(',')[0] # 返回第一个 IP 地址，因为有 cloudflare 的代理，所以可能有多个 IP 地址
-    # 如果没有，使用 request.remote_addr 获取客户端的 IP 地址
+        # 获取所有IP，取最右边的（最后一个代理添加的，相对可信）
+        forwarded_ips = request.headers.get('X-Forwarded-For').split(',')
+        # 从右往左找第一个不是内网IP的地址
+        for ip in reversed(forwarded_ips):
+            ip = ip.strip()
+            # 过滤内网IP（可选，增强安全性）
+            if not ip.startswith(('10.', '172.16.', '172.17.', '172.18.', '172.19.',
+                                  '172.20.', '172.21.', '172.22.', '172.23.', '172.24.',
+                                  '172.25.', '172.26.', '172.27.', '172.28.', '172.29.',
+                                  '172.30.', '172.31.', '192.168.', '127.')):
+                return ip
+        # 如果都是内网IP，返回第一个
+        return forwarded_ips[0].strip()
+    
+    # 4. 直接连接的IP（无代理）
     return request.remote_addr
 
 # ----- API ----- #
@@ -235,6 +260,29 @@ def getBackgroundImg():
 def sendVerificationEmail():
     # 获取参数
     xl_email = request.json.get('xl_email')
+    captcha_ticket = request.json.get('captcha_ticket')
+    captcha_randstr = request.json.get('captcha_randstr')
+    
+    # 验证验证码参数
+    if not captcha_ticket or not captcha_randstr:
+        return jsonify({
+            'code': 400,
+            'msg': '缺少验证码参数'
+        }), 400
+    
+    # 获取用户IP地址
+    user_ip = get_client_ip()
+    
+    # 验证验证码
+    is_valid, error_msg = verify_captcha(captcha_ticket, captcha_randstr, user_ip)
+    if not is_valid:
+        print(f"[SECURITY] 验证码验证失败: {error_msg}, IP: {user_ip}, Email: {xl_email}")
+        return jsonify({
+            'code': 403,
+            'msg': '验证码验证失败'
+        }), 403
+    
+    print(f"[INFO] 验证码验证成功, IP: {user_ip}, Email: {xl_email}")
 
     # 检查邮箱格式
     if not checkEmailFormat(xl_email):
@@ -325,6 +373,29 @@ def sendVerificationEmail():
 def sendRecoveryEmail():
     # 获取参数
     xl_email = request.json.get('xl_email')
+    captcha_ticket = request.json.get('captcha_ticket')
+    captcha_randstr = request.json.get('captcha_randstr')
+    
+    # 验证验证码参数
+    if not captcha_ticket or not captcha_randstr:
+        return jsonify({
+            'code': 400,
+            'msg': '缺少验证码参数'
+        }), 400
+    
+    # 获取用户IP地址
+    user_ip = get_client_ip()
+    
+    # 验证验证码
+    is_valid, error_msg = verify_captcha(captcha_ticket, captcha_randstr, user_ip)
+    if not is_valid:
+        print(f"[SECURITY] 验证码验证失败: {error_msg}, IP: {user_ip}, Email: {xl_email}")
+        return jsonify({
+            'code': 403,
+            'msg': f'验证码验证失败: {error_msg}'
+        }), 403
+    
+    print(f"[INFO] 验证码验证成功, IP: {user_ip}, Email: {xl_email}")
 
     # 检查邮箱格式
     if not checkEmailFormat(xl_email):

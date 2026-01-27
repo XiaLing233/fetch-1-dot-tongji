@@ -25,5 +25,8 @@ jobs:
             cd ~/fetch-1-dot-tongji
             git fetch origin
             git reset --hard origin/master
+            cd python-part
+            source venv/bin/activate
+            pip install -r requirements.txt
             sudo systemctl restart dotB.service
           EOF
