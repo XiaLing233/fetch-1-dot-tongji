@@ -6,7 +6,7 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, se
 from flask_mail import Mail, Message
 from flask_session import Session
 from packages import tjSql, myDecrypt
-from packages.captchaCheck import verify_captcha
+from packages.simpleCaptcha import generate_captcha, verify_captcha_code
 
 import configparser
 from argon2 import PasswordHasher
@@ -203,6 +203,153 @@ def get_client_ip():
     # 4. 直接连接的IP（无代理）
     return request.remote_addr
 
+# IP 限流相关函数
+def check_ip_rate_limit(ip, action, max_attempts=5, block_time=3600):
+    """
+    检查 IP 是否被限流
+    :param ip: IP 地址
+    :param action: 操作类型（如 'register', 'recovery', 'login', 'get_captcha'）
+    :param max_attempts: 最大尝试次数
+    :param block_time: 封禁时间（秒）
+    :return: (是否被限制, 剩余封禁时间)
+    """
+    redis_client = app.config['SESSION_REDIS']
+    block_key = f'ip_block:{action}:{ip}'
+    attempt_key = f'ip_attempt:{action}:{ip}'
+    
+    # 检查是否被封禁
+    block_until = redis_client.get(block_key)
+    if block_until:
+        remaining_time = int(float(block_until) - time.time())
+        if remaining_time > 0:
+            return True, remaining_time
+        else:
+            # 封禁已过期，清理数据
+            redis_client.delete(block_key)
+            redis_client.delete(attempt_key)
+    
+    return False, 0
+
+def record_ip_attempt(ip, action, max_attempts=5, block_time=3600):
+    """
+    记录 IP 失败尝试
+    :param ip: IP 地址
+    :param action: 操作类型
+    :param max_attempts: 最大尝试次数
+    :param block_time: 封禁时间（秒）
+    :return: (是否被封禁, 当前尝试次数)
+    """
+    redis_client = app.config['SESSION_REDIS']
+    attempt_key = f'ip_attempt:{action}:{ip}'
+    block_key = f'ip_block:{action}:{ip}'
+    
+    # 增加失败次数
+    attempts = redis_client.incr(attempt_key)
+    
+    # 设置过期时间（1小时后自动清零）
+    if attempts == 1:
+        redis_client.expire(attempt_key, block_time)
+    
+    # 如果失败次数达到上限，封禁IP
+    if attempts >= max_attempts:
+        block_until = time.time() + block_time
+        redis_client.setex(block_key, block_time, str(block_until))
+        redis_client.delete(attempt_key)  # 清除尝试计数
+        return True, attempts
+    
+    return False, attempts
+
+def clear_ip_attempts(ip, action):
+    """
+    清除 IP 的失败记录（成功后调用）
+    """
+    redis_client = app.config['SESSION_REDIS']
+    attempt_key = f'ip_attempt:{action}:{ip}'
+    redis_client.delete(attempt_key)
+
+def check_daily_email_limit(ip):
+    """
+    检查 IP 每日发送邮件限制
+    :param ip: IP 地址
+    :return: (是否超限, 当前发送次数, 最大次数)
+    """
+    redis_client = app.config['SESSION_REDIS']
+    daily_key = f'daily_email:{ip}'
+    
+    # 获取今天的日期作为key的一部分，确保每天重置
+    today = datetime.datetime.now().strftime('%Y%m%d')
+    daily_key_with_date = f'{daily_key}:{today}'
+    
+    # 获取今日发送次数
+    count = redis_client.get(daily_key_with_date)
+    if count:
+        count = int(count)
+        # 每日最多发送10次邮件
+        MAX_DAILY_EMAILS = 10
+        if count >= MAX_DAILY_EMAILS:
+            return True, count, MAX_DAILY_EMAILS
+    
+    return False, int(count) if count else 0, MAX_DAILY_EMAILS
+
+def record_email_sent(ip, email):
+    """
+    记录邮件发送，用于每日限制和行为分析
+    :param ip: IP 地址
+    :param email: 邮箱地址
+    """
+    redis_client = app.config['SESSION_REDIS']
+    today = datetime.datetime.now().strftime('%Y%m%d')
+    
+    # 记录每日发送次数
+    daily_key = f'daily_email:{ip}:{today}'
+    count = redis_client.incr(daily_key)
+    
+    # 设置过期时间为第二天凌晨（24小时+当前时间到午夜的时间）
+    if count == 1:
+        now = datetime.datetime.now()
+        tomorrow = now + datetime.timedelta(days=1)
+        midnight = datetime.datetime.combine(tomorrow.date(), datetime.time.min)
+        seconds_until_midnight = int((midnight - now).total_seconds())
+        redis_client.expire(daily_key, seconds_until_midnight + 3600)  # 多加1小时容错
+    
+    # 记录发送但未验证的行为（用于检测滥用）
+    unverified_key = f'unverified_emails:{ip}:{today}'
+    redis_client.sadd(unverified_key, email)
+    redis_client.expire(unverified_key, 86400)  # 24小时过期
+    
+    print(f"[INFO] IP {ip} 今日已发送 {count} 封邮件")
+
+def clear_unverified_email(ip, email):
+    """
+    清除未验证邮件记录（用户成功注册/找回密码后调用）
+    :param ip: IP 地址
+    :param email: 邮箱地址
+    """
+    redis_client = app.config['SESSION_REDIS']
+    today = datetime.datetime.now().strftime('%Y%m%d')
+    unverified_key = f'unverified_emails:{ip}:{today}'
+    redis_client.srem(unverified_key, email)
+
+def check_abuse_pattern(ip):
+    """
+    检查是否存在滥用模式：发送大量邮件但不完成验证
+    :param ip: IP 地址
+    :return: (是否可疑, 未验证邮件数量)
+    """
+    redis_client = app.config['SESSION_REDIS']
+    today = datetime.datetime.now().strftime('%Y%m%d')
+    
+    # 获取今日未验证的邮件数量
+    unverified_key = f'unverified_emails:{ip}:{today}'
+    unverified_count = redis_client.scard(unverified_key)
+    
+    # 如果未验证的邮件超过5封，标记为可疑
+    if unverified_count >= 5:
+        print(f"[SECURITY] 检测到可疑行为: IP {ip} 有 {unverified_count} 封未验证邮件")
+        return True, unverified_count
+    
+    return False, unverified_count
+
 # ----- API ----- #
 
 # 获取背景图片
@@ -240,14 +387,60 @@ def getBackgroundImg():
     }), 200
 
 
-# 验证码验证接口
+# 获取图形验证码
+'''
+> 返回
+
+{
+    "code": 200,
+    "msg": "成功",
+    "data": "base64编码的验证码图片"
+}
+'''
+@app.route('/api/getCaptcha', methods=['GET'])
+def getCaptcha():
+    # 获取客户端IP
+    user_ip = get_client_ip()
+
+    # 检查该IP获取验证码的频率（防止滥用），限制每分钟最多10次
+    redis_client = app.config['SESSION_REDIS']
+    captcha_rate_key = f'captcha_rate:{user_ip}'
+    captcha_count = redis_client.get(captcha_rate_key)
+    
+    if captcha_count:
+        captcha_count = int(captcha_count)
+        if captcha_count >= 10:
+            return jsonify({
+                'code': 429,
+                'msg': '获取验证码过于频繁，请稍后再试'
+            }), 429
+        redis_client.incr(captcha_rate_key)
+    else:
+        redis_client.setex(captcha_rate_key, 60, 1)  # 60秒过期
+    
+    # 生成验证码
+    code, img_base64 = generate_captcha()
+    
+    # 将验证码存储到 session 中
+    session['captcha_code'] = code.upper()  # 统一转大写存储
+    session['captcha_time'] = time.time()
+    
+    print(f"[INFO] 生成验证码: {code}, IP: {user_ip}")
+    
+    return jsonify({
+        'code': 200,
+        'msg': '成功',
+        'data': img_base64
+    }), 200
+
+
+# 发送注册验证邮件接口
 '''
 > 传入：
 
 {
     "xl_email": "admin@tongji.edu.cn",
-    "captcha_ticket": "验证码票据",
-    "captcha_randstr": "随机字符串"
+    "captcha_code": "用户输入的验证码"
 }
 
 
@@ -262,29 +455,75 @@ def getBackgroundImg():
 def sendVerificationEmail():
     # 获取参数
     xl_email = request.json.get('xl_email')
-    captcha_ticket = request.json.get('captcha_ticket')
-    captcha_randstr = request.json.get('captcha_randstr')
+    captcha_code = request.json.get('captcha_code')
     
     # 验证验证码参数
-    if not captcha_ticket or not captcha_randstr:
+    if not captcha_code:
         return jsonify({
             'code': 400,
-            'msg': '缺少验证码参数'
+            'msg': '请输入验证码'
         }), 400
     
     # 获取用户IP地址
     user_ip = get_client_ip()
     
-    # 验证验证码
-    is_valid, error_msg = verify_captcha(captcha_ticket, captcha_randstr, user_ip)
-    if not is_valid:
-        print(f"[SECURITY] 验证码验证失败: {error_msg}, IP: {user_ip}, Email: {xl_email}")
+    # 检查每日发送邮件限制（防止资源耗尽攻击）
+    is_daily_limited, daily_count, max_daily = check_daily_email_limit(user_ip)
+    if is_daily_limited:
+        print(f"[SECURITY] IP {user_ip} 达到每日邮件发送上限: {daily_count}/{max_daily}")
         return jsonify({
             'code': 403,
-            'msg': '验证码验证失败'
+            'msg':f'操作过于频繁，请稍后再试(err: -80001)'
         }), 403
     
-    print(f"[INFO] 验证码验证成功, IP: {user_ip}, Email: {xl_email}")
+    # 检查滥用模式（发送邮件但不完成验证）
+    is_suspicious, unverified_count = check_abuse_pattern(user_ip)
+    if is_suspicious:
+        print(f"[SECURITY] 检测到可疑行为: IP {user_ip} 有 {unverified_count} 封未验证邮件")
+        # 对可疑IP施加更严格的限制
+        if unverified_count >= 5:
+            return jsonify({
+                'code': 403,
+                'msg': '操作过于频繁，请稍后再试(err: -80002)'
+            }), 403
+    
+    # 检查IP是否被封禁
+    is_blocked, remaining_time = check_ip_rate_limit(user_ip, 'register')
+    if is_blocked:
+        minutes = remaining_time // 60
+        return jsonify({
+            'code': 403,
+            'msg': f'操作过于频繁，请稍后再试(err: -80003)'
+        }), 403
+    
+    # 验证图形验证码
+    session_captcha = session.get('captcha_code')
+    captcha_time = session.get('captcha_time', 0)
+    
+    # 检查验证码是否过期（5分钟）
+    if time.time() - captcha_time > 300:
+        return jsonify({
+            'code': 400,
+            'msg': '验证码已过期，请刷新'
+        }), 400
+    
+    # 验证验证码
+    MAX_ATTEMPTS = 5
+    if not verify_captcha_code(captcha_code, session_captcha):
+        print(f"[SECURITY] 图形验证码验证失败, IP: {user_ip}, Email: {xl_email}")
+        # 记录失败尝试
+        is_now_blocked, attempts = record_ip_attempt(user_ip, 'register', max_attempts=MAX_ATTEMPTS, block_time=3600)
+        if is_now_blocked:
+            return jsonify({
+                'code': 403,
+                'msg': '操作过于频繁，请稍后再试(err: -80004)'
+            }), 403
+        return jsonify({
+            'code': 400,
+            'msg': f'验证码错误，您还有 {MAX_ATTEMPTS - attempts} 次机会'
+        }), 400
+    
+    print(f"[INFO] 图形验证码验证成功, IP: {user_ip}, Email: {xl_email}")
 
     # 检查邮箱格式
     if not checkEmailFormat(xl_email):
@@ -311,7 +550,7 @@ def sendVerificationEmail():
     if not lock_acquired:
         return jsonify({
             'code': 429,
-            'msg': '请求过于频繁，请稍后再试'
+            'msg': '操作过于频繁，请稍后再试(err: -80005)'
         }), 429
     
     try:
@@ -340,6 +579,9 @@ def sendVerificationEmail():
         
         # 在 Redis 中记录发送时间（用于频率限制，过期时间 5 分钟）
         redis_client.setex(rate_limit_key, 300, str(time.time()))
+        
+        # 记录邮件发送（用于每日限制和滥用检测）
+        record_email_sent(user_ip, xl_email)
 
         # 发送邮件
         print("[DEBUG] 发送邮件！")
@@ -361,8 +603,7 @@ def sendVerificationEmail():
 
 {
     "xl_email": "admin@tongji.edu.cn",
-    "captcha_ticket": "验证码票据",
-    "captcha_randstr": "随机字符串"
+    "captcha_code": "用户输入的验证码"
 }
 
 
@@ -377,29 +618,75 @@ def sendVerificationEmail():
 def sendRecoveryEmail():
     # 获取参数
     xl_email = request.json.get('xl_email')
-    captcha_ticket = request.json.get('captcha_ticket')
-    captcha_randstr = request.json.get('captcha_randstr')
+    captcha_code = request.json.get('captcha_code')
     
     # 验证验证码参数
-    if not captcha_ticket or not captcha_randstr:
+    if not captcha_code:
         return jsonify({
             'code': 400,
-            'msg': '缺少验证码参数'
+            'msg': '请输入验证码'
         }), 400
     
     # 获取用户IP地址
     user_ip = get_client_ip()
     
-    # 验证验证码
-    is_valid, error_msg = verify_captcha(captcha_ticket, captcha_randstr, user_ip)
-    if not is_valid:
-        print(f"[SECURITY] 验证码验证失败: {error_msg}, IP: {user_ip}, Email: {xl_email}")
+    # 检查每日发送邮件限制（防止资源耗尽攻击）
+    is_daily_limited, daily_count, max_daily = check_daily_email_limit(user_ip)
+    if is_daily_limited:
+        print(f"[SECURITY] IP {user_ip} 达到每日邮件发送上限: {daily_count}/{max_daily}")
         return jsonify({
             'code': 403,
-            'msg': f'验证码验证失败: {error_msg}'
+            'msg': f'操作过于频繁，请稍后再试(err: -90001)'
         }), 403
     
-    print(f"[INFO] 验证码验证成功, IP: {user_ip}, Email: {xl_email}")
+    # 检查滥用模式（发送邮件但不完成验证）
+    is_suspicious, unverified_count = check_abuse_pattern(user_ip)
+    if is_suspicious:
+        print(f"[SECURITY] 检测到可疑行为: IP {user_ip} 有 {unverified_count} 封未验证邮件")
+        # 对可疑IP施加更严格的限制
+        if unverified_count >= 5:
+            return jsonify({
+                'code': 403,
+                'msg': '操作过于频繁，请稍后再试(err: -90002)'
+            }), 403
+    
+    # 检查IP是否被封禁
+    is_blocked, remaining_time = check_ip_rate_limit(user_ip, 'recovery')
+    if is_blocked:
+        minutes = remaining_time // 60
+        return jsonify({
+            'code': 403,
+            'msg': f'操作过于频繁，请稍后再试(err: -90003)'
+        }), 403
+    
+    # 验证图形验证码
+    session_captcha = session.get('captcha_code')
+    captcha_time = session.get('captcha_time', 0)
+    
+    # 检查验证码是否过期（5分钟）
+    if time.time() - captcha_time > 300:
+        return jsonify({
+            'code': 400,
+            'msg': '验证码已过期，请刷新'
+        }), 400
+    
+    # 验证验证码
+    MAX_ATTEMPTS = 5
+    if not verify_captcha_code(captcha_code, session_captcha):
+        print(f"[SECURITY] 图形验证码验证失败, IP: {user_ip}, Email: {xl_email}")
+        # 记录失败尝试
+        is_now_blocked, attempts = record_ip_attempt(user_ip, 'recovery', max_attempts=MAX_ATTEMPTS, block_time=3600)
+        if is_now_blocked:
+            return jsonify({
+                'code': 403,
+                'msg': '操作过于频繁，请稍后再试(err: -90004)'
+            }), 403
+        return jsonify({
+            'code': 400,
+            'msg': f'验证码错误，您还有 {MAX_ATTEMPTS - attempts} 次机会'
+        }), 400
+    
+    print(f"[INFO] 图形验证码验证成功, IP: {user_ip}, Email: {xl_email}")
 
     # 检查邮箱格式
     if not checkEmailFormat(xl_email):
@@ -426,7 +713,7 @@ def sendRecoveryEmail():
     if not lock_acquired:
         return jsonify({
             'code': 429,
-            'msg': '请求过于频繁，请稍后再试'
+            'msg': '操作过于频繁，请稍后再试(err: -90005)'
         }), 429
     
     try:
@@ -455,6 +742,9 @@ def sendRecoveryEmail():
         
         # 在 Redis 中记录发送时间（用于频率限制，过期时间 5 分钟）
         redis_client.setex(rate_limit_key, 300, str(time.time()))
+        
+        # 记录邮件发送（用于每日限制和滥用检测）
+        record_email_sent(user_ip, xl_email)
 
         # 发送邮件
         sendEmailFindPassword(xl_email, token)
@@ -551,6 +841,10 @@ def register():
 
     # 登录日志
     tjSql.sqlUpdateLoginLog(xl_email, get_client_ip(), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    
+    # 清除未验证邮件记录（注册成功）
+    user_ip = get_client_ip()
+    clear_unverified_email(user_ip, xl_email)
 
     # 返回 token
     access_token = create_access_token(identity=xl_email)
@@ -595,9 +889,23 @@ def login():
     print(request.json)
     xl_email = request.json.get('xl_email')
     xl_password = request.json.get('xl_password')
+    
+    # 获取用户IP地址
+    user_ip = get_client_ip()
+    
+    # 检查IP是否被封禁
+    is_blocked, remaining_time = check_ip_rate_limit(user_ip, 'login', max_attempts=5, block_time=900)  # 5次机会，封禁15分钟
+    if is_blocked:
+        minutes = remaining_time // 60
+        return jsonify({
+            'code': 403,
+            'msg': f'登录失败次数过多，请 {minutes} 分钟后再试'
+        }), 403
 
     # 先判断用户名是否存在
     if not tjSql.sqlUserExist(xl_email):
+        # 记录失败尝试
+        record_ip_attempt(user_ip, 'login', max_attempts=5, block_time=900)
         return jsonify({
             'code': 400,
             # 'msg': '用户不存在'
@@ -616,11 +924,21 @@ def login():
     try: 
         PasswordHasher().verify(hashed_password, xl_password)
     except Exception:
+        # 记录失败尝试
+        is_now_blocked, attempts = record_ip_attempt(user_ip, 'login', max_attempts=5, block_time=900)
+        if is_now_blocked:
+            return jsonify({
+                'code': 403,
+                'msg': '失败次数过多，请稍后再试(err: -70001)'
+            }), 403
         return jsonify({
             'code': 400,
             # 'msg': '密码错误'
             'msg': '用户名或密码错误'
         }), 400
+    
+    # 登录成功，清除该IP的失败记录
+    clear_ip_attempts(user_ip, 'login')
 
     # 登录日志
     tjSql.sqlUpdateLoginLog(xl_email, get_client_ip(), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -719,6 +1037,10 @@ def recovery():
 
     # 登录日志
     tjSql.sqlUpdateLoginLog(xl_email, get_client_ip(), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    
+    # 清除未验证邮件记录（找回密码成功）
+    user_ip = get_client_ip()
+    clear_unverified_email(user_ip, xl_email)
 
     # 返回 token
     access_token = create_access_token(identity=xl_email)
