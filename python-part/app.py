@@ -275,6 +275,7 @@ def check_daily_email_limit(ip):
     """
     redis_client = app.config['SESSION_REDIS']
     daily_key = f'daily_email:{ip}'
+    MAX_DAILY_EMAILS = 10
     
     # 获取今天的日期作为key的一部分，确保每天重置
     today = datetime.datetime.now().strftime('%Y%m%d')
@@ -285,7 +286,6 @@ def check_daily_email_limit(ip):
     if count:
         count = int(count)
         # 每日最多发送10次邮件
-        MAX_DAILY_EMAILS = 10
         if count >= MAX_DAILY_EMAILS:
             return True, count, MAX_DAILY_EMAILS
     
