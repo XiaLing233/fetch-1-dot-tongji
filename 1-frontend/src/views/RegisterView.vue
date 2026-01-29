@@ -36,6 +36,23 @@
                 <el-form-item label="确认密码" prop="xl_password_confirm">
                     <el-input type="password" v-model="form.xl_password_confirm" show-password></el-input>
                 </el-form-item>
+                <el-form-item label="图形验证码" prop="xl_captcha_code">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <el-input v-model="form.xl_captcha_code" placeholder="请输入验证码" style="flex: 1;"></el-input>
+                        <div style="position: relative; cursor: pointer;" @click="refreshCaptcha">
+                            <img v-if="captchaImage && !captchaLoading" :src="'data:image/png;base64,' + captchaImage" alt="验证码" style="width: 120px; height: 50px; border: 1px solid #dcdfe6; border-radius: 4px; display: block;" />
+                            <div v-if="captchaLoading" style="width: 120px; height: 50px; border: 1px solid #dcdfe6; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: #f5f7fa; color: #909399;">
+                                <i class="el-icon-loading" style="font-size: 20px;"></i>
+                            </div>
+                            <div v-else-if="!captchaImage" style="width: 120px; height: 50px; border: 1px solid #dcdfe6; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: #f5f7fa; color: #909399;">
+                                点击加载
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 5px;">
+                        <el-link type="primary" @click="refreshCaptcha" :underline="false" style="font-size: 12px;">看不清，再换一张</el-link>
+                    </div>
+                </el-form-item>
                 <el-form-item label="验证码" prop="xl_veri_code">
                     <el-input v-model="form.xl_veri_code">
                     <template #append>
@@ -67,9 +84,12 @@ export default {
                 xl_email: '',
                 xl_password: '',
                 xl_password_confirm: '',
+                xl_captcha_code: '',
                 xl_veri_code: ''
             },
             backgroundPic: '', // base64 encoded image
+            captchaImage: '', // 图形验证码图片
+            captchaLoading: false, // 验证码加载状态
             emailCounter: 0,
             openDialog: false,
             sendingEmail: false,
@@ -92,6 +112,10 @@ export default {
                         callback(new Error('两次输入的密码不一致'))
                     }
                 }, trigger: 'blur' }
+            ],
+            xl_captcha_code: [
+                { required: true, message: '请输入图形验证码', trigger: 'blur' },
+                { pattern: /^[a-zA-Z0-9]{4}$/, message: '验证码为4位数字或字母', trigger: 'blur' }
             ],
             xl_veri_code: [
                 { required: true, message: '请输入验证码', trigger: 'blur' },
@@ -163,51 +187,22 @@ export default {
             console.log(formEl);
             if (!formEl) return;
 
-            formEl.validateField(["xl_email", "xl_password", "xl_password_confirm"], (valid) => {
+            formEl.validateField(["xl_email", "xl_password", "xl_password_confirm", "xl_captcha_code"], (valid) => {
                 if (valid) {
-                    // 先调用腾讯验证码
-                    this.showCaptcha();
+                    // 直接发送邮件验证码
+                    this.sendEmailWithCaptcha();
                 }
             })
         },
-        // 显示腾讯验证码
-        showCaptcha() {
-            try {
-                const captcha = new TencentCaptcha('190271421', (res) => {
-                    this.handleCaptchaCallback(res);
-                }, {});
-                captcha.show();
-            } catch (error) {
-                console.error('验证码加载失败:', error);
-                ElMessage({
-                    message: '验证码加载失败，请刷新页面重试',
-                    type: 'error'
-                });
-            }
-        },
-        // 处理验证码回调
-        handleCaptchaCallback(res) {
-            // ret: 0-验证成功, 2-用户关闭验证码
-            if (res.ret === 0) {
-                // 验证成功，发送邮件验证码
-                this.sendEmailWithCaptcha(res.ticket, res.randstr);
-            } else if (res.ret === 2) {
-                ElMessage({
-                    message: '已取消验证',
-                    type: 'info'
-                });
-            }
-        },
-        // 验证码验证成功后，发送邮件
-        sendEmailWithCaptcha(ticket, randstr) {
+        // 发送邮件验证码
+        sendEmailWithCaptcha() {
             this.sendingEmail = true;
             axios({
                 method: 'post',
                 url: '/api/sendVerificationEmail',
                 data: {
                     xl_email: this.form.xl_email + '@tongji.edu.cn',
-                    captcha_ticket: ticket,
-                    captcha_randstr: randstr
+                    captcha_code: this.form.xl_captcha_code
                 }
             })
             .then(response => {
@@ -234,6 +229,30 @@ export default {
             .finally(() => {
                 this.sendingEmail = false;
             })
+        },
+        // 获取图形验证码
+        async getCaptcha() {
+            if (this.captchaLoading) return; // 防止重复请求
+            
+            this.captchaLoading = true;
+            try {
+                const response = await axios.get('/api/getCaptcha');
+                this.captchaImage = response.data.data;
+            } catch (error) {
+                console.log(error);
+                ElMessage({
+                    message: error.response?.data?.msg || '获取验证码失败',
+                    type: 'error'
+                });
+            } finally {
+                this.captchaLoading = false;
+            }
+        },
+        // 刷新验证码
+        refreshCaptcha() {
+            if (this.captchaLoading) return; // 防止重复请求
+            this.form.xl_captcha_code = '';  // 清空输入
+            this.getCaptcha();
         }
     },
     mounted() {
@@ -250,6 +269,8 @@ export default {
                 console.log(error)
             })
         }
+        // 加载验证码
+        this.getCaptcha();
     }
 }
 </script>
