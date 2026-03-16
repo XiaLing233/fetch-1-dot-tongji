@@ -38,4 +38,4 @@ typing_extensions==4.13.0
 urllib3==2.6.3
 Werkzeug==3.1.5
 xmltodict==0.14.2
-pillow==12.1.0
+pillow==12.1.1

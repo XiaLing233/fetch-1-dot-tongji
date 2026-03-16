@@ -12,7 +12,7 @@
             :show-icon="true" />
         </div>
         <el-card
-        style="margin: 20px auto; height: calc(100vh - 140px);"
+        style="margin: 20px auto; height: calc(100vh - 140px); display: flex; flex-direction: column;"
         shadow="never"
     >
     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -32,8 +32,8 @@
     </div>
         <el-table
             :data="paginatedData"
-            style="width: 100%"
-            height="800px"
+            style="width: 100%; flex: 1;"
+            :max-height="600"
             stripe
             border
             @row-click="findMyCommonMsgPublishById"
