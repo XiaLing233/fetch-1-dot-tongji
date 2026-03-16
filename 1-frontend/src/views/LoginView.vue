@@ -126,9 +126,7 @@ export default {
                     headers: {
                         'X-CSRF-TOKEN': get_csrf_token(document.cookie)
                     },
-                    data: {
-                        xl_email: this.form.xl_email + '@tongji.edu.cn'
-                    }
+                    data: {}
                 })
                 this.$store.commit('setUserInfo', response.data.data)
                 // console.log("setUserInfo")

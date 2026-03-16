@@ -2,7 +2,7 @@
 
 from flask import Flask, request, jsonify, session
 # from flask_cors import CORS
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, set_access_cookies, unset_access_cookies
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, set_access_cookies, unset_access_cookies, get_jwt_identity
 from flask_mail import Mail, Message
 from flask_session import Session
 from packages import tjSql, myDecrypt
@@ -1072,7 +1072,6 @@ def recovery():
 > 传入：
 
 {
-    "xl_email": "admin@tongji.edu.cn",
     "xl_newpassword": "加密后的新密码"
 }
 
@@ -1087,9 +1086,14 @@ json
 @app.route('/api/changePassword', methods=['POST'])
 @jwt_required()
 def changePassword():
-    # 获取参数
-    xl_email = request.json.get('xl_email')
-    xl_newpassword = request.json.get('xl_newpassword')
+    payload = request.get_json(silent=True) or {}
+    xl_email = get_jwt_identity()
+    xl_newpassword = payload.get('xl_newpassword')
+    if not xl_newpassword:
+        return jsonify({
+            'code': 400,
+            'msg': '缺少参数'
+        }), 400
 
     # 解密密码
     xl_newpassword = myDecrypt.decryptPassword(xl_newpassword)
@@ -1239,8 +1243,7 @@ def downloadAttachmentByFileName():
 @app.route('/api/getUserInfo', methods=['POST'])
 @jwt_required()
 def getUserInfo():
-    xl_email = request.json.get('xl_email')
-
+    xl_email = get_jwt_identity()
     print("xl_email: ", xl_email)
 
     # 查询用户信息
@@ -1270,8 +1273,14 @@ def getUserInfo():
 @app.route('/api/toggleReceiveNoti', methods=['POST'])
 @jwt_required()
 def toggleReceiveNoti():
-    xl_email = request.json.get('xl_email')
-    expect_option = request.json.get('expect_option')
+    payload = request.get_json(silent=True) or {}
+    xl_email = get_jwt_identity()
+    expect_option = payload.get('expect_option')
+    if expect_option is None:
+        return jsonify({
+            'code': 400,
+            'msg': '缺少参数'
+        }), 400
 
     tjSql.sqltoggleReceiveNoti(xl_email, expect_option)
 

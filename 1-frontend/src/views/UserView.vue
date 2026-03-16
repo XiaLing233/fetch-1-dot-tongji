@@ -134,7 +134,6 @@ export default {
                         'X-CSRF-TOKEN': get_csrf_token(document.cookie)
                     },
                     data: {
-                        xl_email: this.$store.state.userInfo.xl_email,
                         expect_option: !this.now_option
                     }
                 })
@@ -194,7 +193,6 @@ export default {
                             'X-CSRF-TOKEN': get_csrf_token(document.cookie)
                         },
                         data: {
-                            xl_email: this.$store.state.userInfo.xl_email,
                             xl_newpassword: passwordEncrypt(this.password.new)
                         }
                         })
@@ -250,9 +248,7 @@ export default {
                 headers: {
                     'X-CSRF-TOKEN': get_csrf_token(document.cookie)
                 },
-                data: {
-                    xl_email: this.$store.state.userInfo.xl_email // 这里不用再加 @tongji.edu.cn 了
-                }
+                data: {}
             })
             .then(response => {
                     this.$store.commit('setUserInfo', response.data.data)

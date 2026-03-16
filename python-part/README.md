@@ -217,8 +217,7 @@ domain = static.xialing.icu
 ```json
 {
     "xl_email": "admin@tongji.edu.cn",
-    "captcha_ticket": "验证码票据",
-    "captcha_randstr": "随机字符串"
+    "captcha_code": "用户输入的图形验证码"
 }
 ```
 
@@ -240,8 +239,7 @@ domain = static.xialing.icu
 ```json
 {
     "xl_email": "admin@tongji.edu.cn",
-    "captcha_ticket": "验证码票据",
-    "captcha_randstr": "随机字符串"
+    "captcha_code": "用户输入的图形验证码"
 }
 ```
 
@@ -266,7 +264,6 @@ domain = static.xialing.icu
 
 ```json
 {
-    "xl_email": "cirno@tongji.edu.cn",
     "xl_newpassword": "加密后的新密码"
 }
 ```
@@ -366,11 +363,10 @@ domain = static.xialing.icu
 
 `POST`
 
-> 传入：
+> 传入（不需要传邮箱，后端从 JWT identity 读取）：
 
 ```json
 {
-    "xl_email": "cirno@tongji.edu.cn"
 }
 ```
 
@@ -397,7 +393,6 @@ domain = static.xialing.icu
 
 ```json
 {
-    "xl_email": "cirno@tongji.edu.cn",
     "expect_option": "true | false"
 }
 ```
