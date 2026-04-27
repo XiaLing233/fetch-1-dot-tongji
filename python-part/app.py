@@ -1,37 +1,30 @@
 # Flask 后端
 
-from flask import Flask, request, jsonify, session
-# from flask_cors import CORS
+from flask import Flask, request, jsonify, session, redirect
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, set_access_cookies, unset_access_cookies, get_jwt_identity
-from flask_mail import Mail, Message
 from flask_session import Session
 from packages import tjSql, myDecrypt
-from packages.simpleCaptcha import generate_captcha, verify_captcha_code
 
 import configparser
-from argon2 import PasswordHasher
-import random # 生成随机数
-import re # 正则表达式
-import time # 时间
-import pytz # 时区
-import datetime # 时间
-import redis # redis
-import os # 文件操作
-
-import base64 # base64 编码
-
+import datetime
+import redis
+import os
+import urllib.parse
+import string
+import base64
 import logging
+import requests
+import secrets
+import random
 
 # COS
 from packages.upload_to_cos import CosUpload
 
 MYCOS = CosUpload()
 
-# 不需要链接数据库，因为由 tjSql 完成
-
 # ----- 配置 ----- #
 
-PRODUCTION = True # 是否为生产环境
+PRODUCTION = False # 是否为生产环境
 
 # 读取配置文件
 
@@ -40,19 +33,25 @@ CONFIG.read('config.ini', encoding='utf-8')
 
 SECRET_KEY = CONFIG['JWT']['secret_key']
 
-SMTP_SERVER = CONFIG['Email']['smtp_server']
-SMTP_PORT = CONFIG['Email']['smtp_port']
-SMTP_USERNAME = CONFIG['Email']['smtp_username']
-SMTP_PASSWORD = CONFIG['Email']['smtp_password']
-
 ATTACHMENT_PATH = CONFIG['Storage']['attachment_path']
 IMG_PATH = CONFIG['Storage']['img_path'] # 背景图片路径
+
+# OIDC 配置
+OIDC_IDP_AUTHORIZE_URL = CONFIG['OIDC']['idp_authorize_url']
+OIDC_IDP_TOKEN_URL = CONFIG['OIDC']['idp_token_url']
+OIDC_IDP_USERINFO_URL = CONFIG['OIDC']['idp_userinfo_url']
+OIDC_CLIENT_ID = CONFIG['OIDC']['client_id']
+OIDC_CLIENT_SECRET = CONFIG['OIDC']['client_secret']
+if PRODUCTION:
+    OIDC_REDIRECT_URI = 'https://1.xialing.icu/api/sso/callback'
+    FRONTEND_URL = 'https://1.xialing.icu'
+else:
+    OIDC_REDIRECT_URI = 'http://localhost:5173/api/sso/callback'
+    FRONTEND_URL = 'http://localhost:5173'
 
 # app 初始化
 
 app = Flask(__name__)
-
-# CORS(app, supports_credentials=True) # 支持跨域
 
 # 设置 JWT
 app.config['JWT_SECRET_KEY'] = SECRET_KEY
@@ -65,20 +64,9 @@ if PRODUCTION:
 
 else:
     app.config['JWT_COOKIE_SECURE'] = False
-    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(seconds=10) # token 过期时间
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(hours=1) # token 过期时间
 
 jwt = JWTManager(app)
-
-# 设置邮件
-app.config['MAIL_SERVER'] = SMTP_SERVER
-app.config['MAIL_PORT'] = SMTP_PORT
-app.config['MAIL_USERNAME'] = SMTP_USERNAME
-app.config['MAIL_PASSWORD'] = SMTP_PASSWORD
-app.config['MAIL_USE_SSL'] = True
-
-SMTP_NICKNAME = "琪露诺bot"
-
-mail = Mail(app)
 
 SESSION_SECRET_KEY = CONFIG['Session']['secret_key']
 
@@ -98,78 +86,6 @@ Session(app)
 
 # ----- 功能函数 ----- #
 
-def triedTooManyTimes():
-    return session.get('tried_times', 0) >= 5
-
-# 发送注册邮件
-def sendEmailVerification(recEmail, token):
-    # 创建邮件内容
-    msg = Message(
-        '邮箱验证', 
-        sender=f'{SMTP_NICKNAME} <{SMTP_USERNAME}>',
-        recipients=[recEmail]
-        )
-    msg.body = f'''亲爱的用户：
-
-    您好！感谢您注册我们的服务。
-    
-    您的验证码是：{token}
-    
-    请在10分钟内完成验证。出于安全考虑，请不要将验证码泄露给他人。
-    
-    如果这不是您的操作，请忽略此邮件。
-        
-    此致
-    1.xialing.icu
-    '''
-    
-    # 发送邮件
-    try:
-        mail.send(msg)
-        print("邮件发送成功")
-    except Exception as e:
-        print("邮件发送失败：", e)
-
-# 发送找回密码邮件
-def sendEmailFindPassword(recEmail, token):
-    # 创建邮件内容
-    msg = Message(
-        '找回密码', 
-        sender=f'{SMTP_NICKNAME} <{SMTP_USERNAME}>',
-        recipients=[recEmail]
-        )
-    msg.body = f'''亲爱的用户：
-
-    您好！您正在尝试找回密码。
-    
-    您的验证码是：{token}
-    
-    请在10分钟内完成验证。出于安全考虑，请不要将验证码泄露给他人。
-    
-    如果这不是您的操作，请忽略此邮件。
-    
-    此致
-    1.xialing.icu
-    '''
-    
-    # 发送邮件
-    try:
-        mail.send(msg)
-        print("邮件发送成功")
-    except Exception as e:
-        print("邮件发送失败：", e)
-
-# 检查邮箱格式
-def checkEmailFormat(email):
-    if re.match(r'^[a-zA-Z0-9._-]+@tongji\.edu\.cn$', email):
-        return True
-    else:
-        return False
-
-# 生成验证码，6位数字
-def generateVerificationCode():
-    return str(random.randint(100000, 999999))
-
 # 获取 IP 地址
 def get_client_ip():
     """
@@ -179,176 +95,26 @@ def get_client_ip():
     # 1. Cloudflare 特定头部（最可信，无法伪造）
     if 'CF-Connecting-IP' in request.headers:
         return request.headers.get('CF-Connecting-IP')
-    
+
     # 2. X-Real-IP（某些代理使用）
     if 'X-Real-IP' in request.headers:
         return request.headers.get('X-Real-IP')
-    
+
     # 3. X-Forwarded-For（取最右边的IP，即最后一个代理添加的）
     if 'X-Forwarded-For' in request.headers:
-        # 获取所有IP，取最右边的（最后一个代理添加的，相对可信）
         forwarded_ips = request.headers.get('X-Forwarded-For').split(',')
-        # 从右往左找第一个不是内网IP的地址
         for ip in reversed(forwarded_ips):
             ip = ip.strip()
-            # 过滤内网IP（可选，增强安全性）
             if not ip.startswith(('10.', '172.16.', '172.17.', '172.18.', '172.19.',
                                   '172.20.', '172.21.', '172.22.', '172.23.', '172.24.',
                                   '172.25.', '172.26.', '172.27.', '172.28.', '172.29.',
                                   '172.30.', '172.31.', '192.168.', '127.')):
                 return ip
-        # 如果都是内网IP，返回第一个
         return forwarded_ips[0].strip()
-    
+
     # 4. 直接连接的IP（无代理）
     return request.remote_addr
 
-# IP 限流相关函数
-def check_ip_rate_limit(ip, action, max_attempts=5, block_time=3600):
-    """
-    检查 IP 是否被限流
-    :param ip: IP 地址
-    :param action: 操作类型（如 'register', 'recovery', 'login', 'get_captcha'）
-    :param max_attempts: 最大尝试次数
-    :param block_time: 封禁时间（秒）
-    :return: (是否被限制, 剩余封禁时间)
-    """
-    redis_client = app.config['SESSION_REDIS']
-    block_key = f'ip_block:{action}:{ip}'
-    attempt_key = f'ip_attempt:{action}:{ip}'
-    
-    # 检查是否被封禁
-    block_until = redis_client.get(block_key)
-    if block_until:
-        remaining_time = int(float(block_until) - time.time())
-        if remaining_time > 0:
-            return True, remaining_time
-        else:
-            # 封禁已过期，清理数据
-            redis_client.delete(block_key)
-            redis_client.delete(attempt_key)
-    
-    return False, 0
-
-def record_ip_attempt(ip, action, max_attempts=5, block_time=3600):
-    """
-    记录 IP 失败尝试
-    :param ip: IP 地址
-    :param action: 操作类型
-    :param max_attempts: 最大尝试次数
-    :param block_time: 封禁时间（秒）
-    :return: (是否被封禁, 当前尝试次数)
-    """
-    redis_client = app.config['SESSION_REDIS']
-    attempt_key = f'ip_attempt:{action}:{ip}'
-    block_key = f'ip_block:{action}:{ip}'
-    
-    # 增加失败次数
-    attempts = redis_client.incr(attempt_key)
-    
-    # 设置过期时间（1小时后自动清零）
-    if attempts == 1:
-        redis_client.expire(attempt_key, block_time)
-    
-    # 如果失败次数达到上限，封禁IP
-    if attempts >= max_attempts:
-        block_until = time.time() + block_time
-        redis_client.setex(block_key, block_time, str(block_until))
-        redis_client.delete(attempt_key)  # 清除尝试计数
-        return True, attempts
-    
-    return False, attempts
-
-def clear_ip_attempts(ip, action):
-    """
-    清除 IP 的失败记录（成功后调用）
-    """
-    redis_client = app.config['SESSION_REDIS']
-    attempt_key = f'ip_attempt:{action}:{ip}'
-    redis_client.delete(attempt_key)
-
-def check_daily_email_limit(ip):
-    """
-    检查 IP 每日发送邮件限制
-    :param ip: IP 地址
-    :return: (是否超限, 当前发送次数, 最大次数)
-    """
-    redis_client = app.config['SESSION_REDIS']
-    daily_key = f'daily_email:{ip}'
-    MAX_DAILY_EMAILS = 10
-    
-    # 获取今天的日期作为key的一部分，确保每天重置
-    today = datetime.datetime.now().strftime('%Y%m%d')
-    daily_key_with_date = f'{daily_key}:{today}'
-    
-    # 获取今日发送次数
-    count = redis_client.get(daily_key_with_date)
-    if count:
-        count = int(count)
-        # 每日最多发送10次邮件
-        if count >= MAX_DAILY_EMAILS:
-            return True, count, MAX_DAILY_EMAILS
-    
-    return False, int(count) if count else 0, MAX_DAILY_EMAILS
-
-def record_email_sent(ip, email):
-    """
-    记录邮件发送，用于每日限制和行为分析
-    :param ip: IP 地址
-    :param email: 邮箱地址
-    """
-    redis_client = app.config['SESSION_REDIS']
-    today = datetime.datetime.now().strftime('%Y%m%d')
-    
-    # 记录每日发送次数
-    daily_key = f'daily_email:{ip}:{today}'
-    count = redis_client.incr(daily_key)
-    
-    # 设置过期时间为第二天凌晨（24小时+当前时间到午夜的时间）
-    if count == 1:
-        now = datetime.datetime.now()
-        tomorrow = now + datetime.timedelta(days=1)
-        midnight = datetime.datetime.combine(tomorrow.date(), datetime.time.min)
-        seconds_until_midnight = int((midnight - now).total_seconds())
-        redis_client.expire(daily_key, seconds_until_midnight + 3600)  # 多加1小时容错
-    
-    # 记录发送但未验证的行为（用于检测滥用）
-    unverified_key = f'unverified_emails:{ip}:{today}'
-    redis_client.sadd(unverified_key, email)
-    redis_client.expire(unverified_key, 86400)  # 24小时过期
-    
-    print(f"[INFO] IP {ip} 今日已发送 {count} 封邮件")
-
-def clear_unverified_email(ip, email):
-    """
-    清除未验证邮件记录（用户成功注册/找回密码后调用）
-    :param ip: IP 地址
-    :param email: 邮箱地址
-    """
-    redis_client = app.config['SESSION_REDIS']
-    today = datetime.datetime.now().strftime('%Y%m%d')
-    unverified_key = f'unverified_emails:{ip}:{today}'
-    redis_client.srem(unverified_key, email)
-
-def check_abuse_pattern(ip):
-    """
-    检查是否存在滥用模式：发送大量邮件但不完成验证
-    :param ip: IP 地址
-    :return: (是否可疑, 未验证邮件数量)
-    """
-    redis_client = app.config['SESSION_REDIS']
-    today = datetime.datetime.now().strftime('%Y%m%d')
-    
-    # 获取今日未验证的邮件数量
-    unverified_key = f'unverified_emails:{ip}:{today}'
-    unverified_count = redis_client.scard(unverified_key)
-    
-    # 如果未验证的邮件超过5封，标记为可疑
-    if unverified_count >= 5:
-        print(f"[SECURITY] 检测到可疑行为: IP {ip} 有 {unverified_count} 封未验证邮件")
-        return True, unverified_count
-    
-    return False, unverified_count
 
 # ----- API ----- #
 
@@ -387,726 +153,119 @@ def getBackgroundImg():
     }), 200
 
 
-# 获取图形验证码
-'''
-> 返回
+# ----- SSO OIDC 登录 ----- #
 
-{
-    "code": 200,
-    "msg": "成功",
-    "data": "base64编码的验证码图片"
-}
-'''
-@app.route('/api/getCaptcha', methods=['GET'])
-def getCaptcha():
-    # 获取客户端IP
-    user_ip = get_client_ip()
+@app.route('/api/sso/login', methods=['GET'])
+def sso_login():
+    '''
+    发起 OIDC 授权请求，重定向到 IdP 登录页
+    '''
+    # 生成随机 state 防止 CSRF
+    state = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
+    session['oidc_state'] = state
 
-    # 检查该IP获取验证码的频率（防止滥用），限制每分钟最多10次
-    redis_client = app.config['SESSION_REDIS']
-    captcha_rate_key = f'captcha_rate:{user_ip}'
-    captcha_count = redis_client.get(captcha_rate_key)
-    
-    if captcha_count:
-        captcha_count = int(captcha_count)
-        if captcha_count >= 10:
-            return jsonify({
-                'code': 429,
-                'msg': '获取验证码过于频繁，请稍后再试'
-            }), 429
-        redis_client.incr(captcha_rate_key)
-    else:
-        redis_client.setex(captcha_rate_key, 60, 1)  # 60秒过期
-    
-    # 生成验证码
-    code, img_base64 = generate_captcha()
-    
-    # 将验证码存储到 session 中
-    session['captcha_code'] = code.upper()  # 统一转大写存储
-    session['captcha_time'] = time.time()
-    
-    print(f"[INFO] 生成验证码: {code}, IP: {user_ip}")
-    
-    return jsonify({
-        'code': 200,
-        'msg': '成功',
-        'data': img_base64
-    }), 200
+    # 构建授权 URL
+    params = {
+        'client_id': OIDC_CLIENT_ID,
+        'redirect_uri': OIDC_REDIRECT_URI,
+        'response_type': 'code',
+        'scope': 'openid profile email',
+        'state': state,
+    }
+    authorize_url = OIDC_IDP_AUTHORIZE_URL + '?' + urllib.parse.urlencode(params)
+
+    return redirect(authorize_url)
 
 
-# 发送注册验证邮件接口
-'''
-> 传入：
+@app.route('/api/sso/callback', methods=['GET'])
+def sso_callback():
+    '''
+    IdP 回调处理：用 code 换 token，再换取用户信息，最后登录本地系统
+    '''
+    code = request.args.get('code')
+    state = request.args.get('state')
+    error = request.args.get('error')
 
-{
-    "xl_email": "admin@tongji.edu.cn",
-    "captcha_code": "用户输入的验证码"
-}
+    def redirect_home(error_msg=None):
+        if error_msg:
+            return redirect(f'{FRONTEND_URL}/?error={urllib.parse.quote(error_msg)}')
+        return redirect(f'{FRONTEND_URL}/')
 
+    if error:
+        return redirect_home(f'IdP 返回错误: {error}')
 
-> 返回
+    if not code or not state:
+        return redirect_home('缺少必要参数')
 
-{
-    "code": 200,
-    "msg": "成功",
-}
-'''
-@app.route('/api/sendVerificationEmail', methods=['POST'])
-def sendVerificationEmail():
-    # 获取参数
-    xl_email = request.json.get('xl_email')
-    captcha_code = request.json.get('captcha_code')
-    
-    # 验证验证码参数
-    if not captcha_code:
-        return jsonify({
-            'code': 400,
-            'msg': '请输入验证码'
-        }), 400
-    
-    # 获取用户IP地址
-    user_ip = get_client_ip()
-    
-    # 检查每日发送邮件限制（防止资源耗尽攻击）
-    is_daily_limited, daily_count, max_daily = check_daily_email_limit(user_ip)
-    if is_daily_limited:
-        print(f"[SECURITY] IP {user_ip} 达到每日邮件发送上限: {daily_count}/{max_daily}")
-        return jsonify({
-            'code': 403,
-            'msg':f'操作过于频繁，请稍后再试(err: -80001)'
-        }), 403
-    
-    # 检查滥用模式（发送邮件但不完成验证）
-    is_suspicious, unverified_count = check_abuse_pattern(user_ip)
-    if is_suspicious:
-        print(f"[SECURITY] 检测到可疑行为: IP {user_ip} 有 {unverified_count} 封未验证邮件")
-        # 对可疑IP施加更严格的限制
-        if unverified_count >= 5:
-            return jsonify({
-                'code': 403,
-                'msg': '操作过于频繁，请稍后再试(err: -80002)'
-            }), 403
-    
-    # 检查IP是否被封禁
-    is_blocked, remaining_time = check_ip_rate_limit(user_ip, 'register')
-    if is_blocked:
-        minutes = remaining_time // 60
-        return jsonify({
-            'code': 403,
-            'msg': f'操作过于频繁，请稍后再试(err: -80003)'
-        }), 403
-    
-    # 验证图形验证码
-    session_captcha = session.get('captcha_code')
-    captcha_time = session.get('captcha_time', 0)
-    
-    # 检查验证码是否过期（5分钟）
-    if time.time() - captcha_time > 300:
-        return jsonify({
-            'code': 400,
-            'msg': '验证码已过期，请刷新'
-        }), 400
-    
-    # 验证验证码
-    MAX_ATTEMPTS = 5
-    if not verify_captcha_code(captcha_code, session_captcha):
-        print(f"[SECURITY] 图形验证码验证失败, IP: {user_ip}, Email: {xl_email}")
-        # 记录失败尝试
-        is_now_blocked, attempts = record_ip_attempt(user_ip, 'register', max_attempts=MAX_ATTEMPTS, block_time=3600)
-        if is_now_blocked:
-            return jsonify({
-                'code': 403,
-                'msg': '操作过于频繁，请稍后再试(err: -80004)'
-            }), 403
-        return jsonify({
-            'code': 400,
-            'msg': f'验证码错误，您还有 {MAX_ATTEMPTS - attempts} 次机会'
-        }), 400
-    
-    print(f"[INFO] 图形验证码验证成功, IP: {user_ip}, Email: {xl_email}")
+    # 验证 state 防止 CSRF
+    expected_state = session.get('oidc_state')
+    if not expected_state or expected_state != state:
+        return redirect_home('State 校验失败，请重新登录')
 
-    # 检查邮箱格式
-    if not checkEmailFormat(xl_email):
-        return jsonify({
-            'code': 400,
-            'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
-        }), 400
+    # 清除 session 中的 state
+    session.pop('oidc_state', None)
 
-    # 检查用户名是否存在
-    if tjSql.sqlUserExist(xl_email):
-        return jsonify({
-            'code': 400,
-            'msg': '用户已注册，请登录'
-        }), 400
-    
-    # 使用 Redis 锁防止并发请求
-    redis_client = app.config['SESSION_REDIS']
-    lock_key = f'email_lock:{xl_email}'
-    lock_value = str(time.time())
-    
-    # 尝试获取锁，锁的过期时间为 10 秒（防止死锁）
-    lock_acquired = redis_client.set(lock_key, lock_value, nx=True, ex=10)
-    
-    if not lock_acquired:
-        return jsonify({
-            'code': 429,
-            'msg': '操作过于频繁，请稍后再试(err: -80005)'
-        }), 429
-    
+    # 用 code 换取 token
+    token_payload = {
+        'grant_type': 'authorization_code',
+        'code': code,
+        'client_id': OIDC_CLIENT_ID,
+        'client_secret': OIDC_CLIENT_SECRET,
+        'redirect_uri': OIDC_REDIRECT_URI,
+    }
+
     try:
-        # 检查发送频率限制（使用 Redis 直接检查，而不是 session）
-        rate_limit_key = f'email_rate_limit:{xl_email}'
-        last_send_time = redis_client.get(rate_limit_key)
-        
-        if last_send_time:
-            last_send_time = float(last_send_time)
-            current_time = time.time()
-            # 如果未超过5分钟，则拒绝请求
-            if (current_time - last_send_time) < 300:  # 300秒 = 5分钟
-                return jsonify({
-                    'code': 429,
-                    'msg': '已经发送过验证码，请及时查收，请格外留意垃圾邮件(邮箱地址正确了吗？)'
-                }), 429
+        token_resp = requests.post(OIDC_IDP_TOKEN_URL, data=token_payload, timeout=10)
+        token_data = token_resp.json()
+    except Exception as e:
+        print(f"[ERROR] Token 请求失败: {e}")
+        return redirect_home('无法从 IdP 获取 Token')
 
-        # 生成验证码
-        token = generateVerificationCode()
+    if 'access_token' not in token_data:
+        print(f"[ERROR] IdP 返回错误: {token_data}")
+        return redirect_home('Token 换取失败')
 
-        # session 中保存验证码
-        session['verification_code'] = token
-        session['email'] = xl_email
-        session['send_time'] = time.time()
-        session['tried_times'] = 0
-        
-        # 在 Redis 中记录发送时间（用于频率限制，过期时间 5 分钟）
-        redis_client.setex(rate_limit_key, 300, str(time.time()))
-        
-        # 记录邮件发送（用于每日限制和滥用检测）
-        record_email_sent(user_ip, xl_email)
+    access_token = token_data['access_token']
 
-        # 发送邮件
-        print("[DEBUG] 发送邮件！")
-        sendEmailVerification(xl_email, token)
-
-        return jsonify({
-            'code': 200,
-            'msg': '发送成功'
-        }), 200
-    
-    finally:
-        # 释放锁
-        redis_client.delete(lock_key)
-
-
-# 找回密码邮件发送
-'''
-> 传入：
-
-{
-    "xl_email": "admin@tongji.edu.cn",
-    "captcha_code": "用户输入的验证码"
-}
-
-
-> 返回
-
-{
-    "code": 200,
-    "msg": "成功",
-}
-'''
-@app.route('/api/sendRecoveryEmail', methods=['POST'])
-def sendRecoveryEmail():
-    # 获取参数
-    xl_email = request.json.get('xl_email')
-    captcha_code = request.json.get('captcha_code')
-    
-    # 验证验证码参数
-    if not captcha_code:
-        return jsonify({
-            'code': 400,
-            'msg': '请输入验证码'
-        }), 400
-    
-    # 获取用户IP地址
-    user_ip = get_client_ip()
-    
-    # 检查每日发送邮件限制（防止资源耗尽攻击）
-    is_daily_limited, daily_count, max_daily = check_daily_email_limit(user_ip)
-    if is_daily_limited:
-        print(f"[SECURITY] IP {user_ip} 达到每日邮件发送上限: {daily_count}/{max_daily}")
-        return jsonify({
-            'code': 403,
-            'msg': f'操作过于频繁，请稍后再试(err: -90001)'
-        }), 403
-    
-    # 检查滥用模式（发送邮件但不完成验证）
-    is_suspicious, unverified_count = check_abuse_pattern(user_ip)
-    if is_suspicious:
-        print(f"[SECURITY] 检测到可疑行为: IP {user_ip} 有 {unverified_count} 封未验证邮件")
-        # 对可疑IP施加更严格的限制
-        if unverified_count >= 5:
-            return jsonify({
-                'code': 403,
-                'msg': '操作过于频繁，请稍后再试(err: -90002)'
-            }), 403
-    
-    # 检查IP是否被封禁
-    is_blocked, remaining_time = check_ip_rate_limit(user_ip, 'recovery')
-    if is_blocked:
-        minutes = remaining_time // 60
-        return jsonify({
-            'code': 403,
-            'msg': f'操作过于频繁，请稍后再试(err: -90003)'
-        }), 403
-    
-    # 验证图形验证码
-    session_captcha = session.get('captcha_code')
-    captcha_time = session.get('captcha_time', 0)
-    
-    # 检查验证码是否过期（5分钟）
-    if time.time() - captcha_time > 300:
-        return jsonify({
-            'code': 400,
-            'msg': '验证码已过期，请刷新'
-        }), 400
-    
-    # 验证验证码
-    MAX_ATTEMPTS = 5
-    if not verify_captcha_code(captcha_code, session_captcha):
-        print(f"[SECURITY] 图形验证码验证失败, IP: {user_ip}, Email: {xl_email}")
-        # 记录失败尝试
-        is_now_blocked, attempts = record_ip_attempt(user_ip, 'recovery', max_attempts=MAX_ATTEMPTS, block_time=3600)
-        if is_now_blocked:
-            return jsonify({
-                'code': 403,
-                'msg': '操作过于频繁，请稍后再试(err: -90004)'
-            }), 403
-        return jsonify({
-            'code': 400,
-            'msg': f'验证码错误，您还有 {MAX_ATTEMPTS - attempts} 次机会'
-        }), 400
-    
-    print(f"[INFO] 图形验证码验证成功, IP: {user_ip}, Email: {xl_email}")
-
-    # 检查邮箱格式
-    if not checkEmailFormat(xl_email):
-        return jsonify({
-            'code': 400,
-            'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
-        }), 400
-
-    # 检查用户是否存在
-    if not tjSql.sqlUserExist(xl_email):
-        return jsonify({
-            'code': 400,
-            'msg': '用户不存在，请移步注册页面'
-        }), 400
-
-    # 使用 Redis 锁防止并发请求
-    redis_client = app.config['SESSION_REDIS']
-    lock_key = f'email_lock:{xl_email}'
-    lock_value = str(time.time())
-    
-    # 尝试获取锁，锁的过期时间为 10 秒（防止死锁）
-    lock_acquired = redis_client.set(lock_key, lock_value, nx=True, ex=10)
-    
-    if not lock_acquired:
-        return jsonify({
-            'code': 429,
-            'msg': '操作过于频繁，请稍后再试(err: -90005)'
-        }), 429
-    
+    # 获取用户信息
     try:
-        # 检查发送频率限制（使用 Redis 直接检查，而不是 session）
-        rate_limit_key = f'email_rate_limit:{xl_email}'
-        last_send_time = redis_client.get(rate_limit_key)
-        
-        if last_send_time:
-            last_send_time = float(last_send_time)
-            current_time = time.time()
-            # 如果未超过5分钟，则拒绝请求
-            if (current_time - last_send_time) < 300:  # 300秒 = 5分钟
-                return jsonify({
-                    'code': 429,
-                    'msg': '已经发送过验证码，请及时查收，请格外留意垃圾邮件(邮箱地址正确了吗？)'
-                }), 429
-        
-        # 生成验证码
-        token = generateVerificationCode()
+        userinfo_resp = requests.get(
+            OIDC_IDP_USERINFO_URL,
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=10
+        )
+        userinfo = userinfo_resp.json()
+    except Exception as e:
+        print(f"[ERROR] UserInfo 请求失败: {e}")
+        return redirect_home('无法从 IdP 获取用户信息')
 
-        # session 中保存验证码
-        session['verification_code'] = token
-        session['email'] = xl_email
-        session['send_time'] = time.time() # 发送时间
-        session['tried_times'] = 0
-        
-        # 在 Redis 中记录发送时间（用于频率限制，过期时间 5 分钟）
-        redis_client.setex(rate_limit_key, 300, str(time.time()))
-        
-        # 记录邮件发送（用于每日限制和滥用检测）
-        record_email_sent(user_ip, xl_email)
+    email = userinfo.get('email')
+    if not email:
+        return redirect_home('IdP 未返回邮箱信息')
 
-        # 发送邮件
-        sendEmailFindPassword(xl_email, token)
+    # 检查本地用户是否存在，不存在则自动创建（JIT provisioning）
+    if not tjSql.sqlUserExist(email):
+        nickname = email.split('@')[0]
+        name = userinfo.get('name', nickname)
+        # 本地密码已无用，使用随机占位值
+        dummy_password = secrets.token_hex(32)
+        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        tjSql.sqlInsertUser(name, email, dummy_password, current_time)
+        print(f"[INFO] 自动创建本地用户: {email}")
 
-        return jsonify({
-            'code': 200,
-            'msg': '发送成功'
-        }), 200
-    
-    finally:
-        # 释放锁
-        redis_client.delete(lock_key)
+    # 登录成功，记录日志
+    tjSql.sqlUpdateLoginLog(email, get_client_ip(), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
+    # 签发本地 JWT 并设置 cookie，然后重定向回前端
+    access_token_local = create_access_token(identity=email)
+    response = redirect_home()
+    set_access_cookies(response, access_token_local)
+    return response
 
-
-# 注册
-'''
-> 传入：
-
-{
-    "xl_email": "admin@tongji.edu.cn",
-    "xl_password": "RSA加密后的密码",
-    "xl_veri_code": "233333"
-}
-
-> 返回
-
-{
-    "code": 200,
-    "msg": "成功",
-}
-'''
-@app.route('/api/register', methods=['POST'])
-def register():
-    if triedTooManyTimes():
-        return jsonify({
-            'code': 429,
-            'msg': '错误次数过多，请稍后再试'
-        }), 429
-
-    # 获取参数
-    xl_email = request.json.get('xl_email')
-    xl_password = request.json.get('xl_password')
-    xl_veri_code = request.json.get('xl_veri_code')
-
-    # 检查邮箱格式
-    if not checkEmailFormat(xl_email):
-        return jsonify({
-            'code': 400,
-            'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
-        }), 400
-
-    # 检查邮箱是否和发送验证码时的一致
-    if session.get('email') != xl_email:
-        return jsonify({
-            'code': 400,
-            'msg': '邮箱与发送验证码时不一致'
-        }), 400
-
-    # 检查用户名是否存在
-    if tjSql.sqlUserExist(xl_email):
-        return jsonify({
-            'code': 400,
-            'msg': '用户已注册，请登录'
-        }), 400
-
-    # 检查验证码是否过期
-    if time.time() - session.get('send_time') > 600:
-        return jsonify({
-            'code': 400,
-            'msg': '验证码过期，请重新发送'
-        }), 400
-
-    # 检查验证码
-    if session.get('verification_code') != xl_veri_code:
-        session['tried_times'] += 1
-
-        return jsonify({
-            'code': 400,
-            'msg': f'验证码错误，您还有{5 - session.get("tried_times")}次机会'
-        }), 400
-
-    # 解密密码
-    xl_password = myDecrypt.decryptPassword(xl_password)
-
-    hashed_password = PasswordHasher().hash(xl_password)
-
-    # 把用户信息写入数据库
-    # 顺序：@前的部分作为用户名; 邮箱; 密码; 当前时间
-    nickname = xl_email.split('@')[0]
-    tz = pytz.timezone('Asia/Shanghai')
-    current_time = datetime.datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
-    tjSql.sqlInsertUser(nickname, xl_email, hashed_password, current_time)
-
-    # 登录日志
-    tjSql.sqlUpdateLoginLog(xl_email, get_client_ip(), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    
-    # 清除未验证邮件记录（注册成功）
-    user_ip = get_client_ip()
-    clear_unverified_email(user_ip, xl_email)
-
-    # 返回 token
-    access_token = create_access_token(identity=xl_email)
-
-    response = jsonify({
-        'code': 200,
-        'msg': '注册成功',
-    })
-
-    set_access_cookies(response, access_token)
-
-    # 清空和验证码相关的 session
-    session.pop('verification_code', None)
-    session.pop('email', None)
-    session.pop('send_time', None)
-    session.pop('tried_times', None)
-
-    # 设置 cookie，不在返回体中设置
-    return response, 200
-
-
-
-
-# 登录
-'''
-> 请求
-{
-    "xl_email": "admin@tongji.edu.cn",
-    "xl_password": "RSA加密&URI编码后的密码"
-}
-
-> 返回
-{
-    "code": 200,
-    "msg": "成功",
-    "xl_token": "12345"
-}
-'''
-@app.route('/api/login', methods=['POST'])
-def login():
-    # 获取参数
-    print(request.json)
-    xl_email = request.json.get('xl_email')
-    xl_password = request.json.get('xl_password')
-    
-    # 获取用户IP地址
-    user_ip = get_client_ip()
-    
-    # 检查IP是否被封禁
-    is_blocked, remaining_time = check_ip_rate_limit(user_ip, 'login', max_attempts=5, block_time=900)  # 5次机会，封禁15分钟
-    if is_blocked:
-        minutes = remaining_time // 60
-        return jsonify({
-            'code': 403,
-            'msg': f'登录失败次数过多，请 {minutes} 分钟后再试'
-        }), 403
-
-    # 先判断用户名是否存在
-    if not tjSql.sqlUserExist(xl_email):
-        # 记录失败尝试
-        record_ip_attempt(user_ip, 'login', max_attempts=5, block_time=900)
-        return jsonify({
-            'code': 400,
-            # 'msg': '用户不存在'
-            'msg': '用户名或密码错误'
-        }), 400
-    
-    # 解密密码
-    xl_password = myDecrypt.decryptPassword(xl_password)
-
-    # 获取数据库中的密码
-    hashed_password = tjSql.sqlGetPassword(xl_email)
-
-    print("数据库中的密码：", hashed_password)
-
-    # 验证密码
-    try: 
-        PasswordHasher().verify(hashed_password, xl_password)
-    except Exception:
-        # 记录失败尝试
-        is_now_blocked, attempts = record_ip_attempt(user_ip, 'login', max_attempts=5, block_time=900)
-        if is_now_blocked:
-            return jsonify({
-                'code': 403,
-                'msg': '失败次数过多，请稍后再试(err: -70001)'
-            }), 403
-        return jsonify({
-            'code': 400,
-            # 'msg': '密码错误'
-            'msg': '用户名或密码错误'
-        }), 400
-    
-    # 登录成功，清除该IP的失败记录
-    clear_ip_attempts(user_ip, 'login')
-
-    # 登录日志
-    tjSql.sqlUpdateLoginLog(xl_email, get_client_ip(), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-
-    # 返回 token
-    access_token = create_access_token(identity=xl_email)
-
-    response = jsonify({
-        'code': 200,
-        'msg': '登录成功',
-    })
-
-    set_access_cookies(response, access_token)
-    # 设置 cookie，不在返回体中设置
-    # response.set_cookie('xl_token', access_token, httponly=True) #, samesite='Strict') # , secure=True)
-
-    return response, 200
-
-# 找回密码
-'''
-> 传入：
-
-{
-    "xl_email": "admin@tongji.edu.cn",
-    "xl_password": "RSA加密后的密码"
-}
-
-
-> 返回
-
-{
-    "code": 200,
-    "msg": "成功",
-}
-'''
-@app.route('/api/recovery', methods=['POST'])
-def recovery():
-    if triedTooManyTimes():
-        return jsonify({
-            'code': 429,
-            'msg': '错误次数过多，请稍后再试'
-        }), 429
-
-    # 获取参数
-    xl_email = request.json.get('xl_email')
-    xl_password = request.json.get('xl_password')
-    xl_veri_code = request.json.get('xl_veri_code')
-
-    print("session中的验证码：", session.get('verification_code'))
-    print("传入的验证码：", xl_veri_code)
-
-    # 检查邮箱格式
-    if not checkEmailFormat(xl_email):
-        return jsonify({
-            'code': 400,
-            'msg': '邮箱格式错误，只接受@tongji.edu.cn的邮箱'
-        }), 400
-
-    # 检查邮箱是否和发送验证码时的一致
-    if session.get('email') != xl_email:
-        return jsonify({
-            'code': 400,
-            'msg': '邮箱与发送验证码时不一致'
-        }), 400
-
-    # 检查用户名是否存在
-    if not tjSql.sqlUserExist(xl_email):
-        return jsonify({
-            'code': 400,
-            'msg': '用户不存在'
-        }), 400
-
-    # 检查验证码是否过期
-    if time.time() - session.get('send_time') > 600:
-        return jsonify({
-            'code': 400,
-            'msg': '验证码过期，请重新发送'
-        }), 400
-
-    # 检查验证码
-    if session.get('verification_code') != xl_veri_code:
-        session['tried_times'] += 1
-
-        return jsonify({
-            'code': 400,
-            'msg': f'验证码错误，您还有{5 - session.get("tried_times")}次机会'
-        }), 400
-
-    # 解密密码
-    xl_password = myDecrypt.decryptPassword(xl_password)
-
-    hashed_password = PasswordHasher().hash(xl_password)
-
-    # 更新密码
-    tjSql.sqlUpdatePassword(xl_email, hashed_password)
-
-    # 登录日志
-    tjSql.sqlUpdateLoginLog(xl_email, get_client_ip(), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    
-    # 清除未验证邮件记录（找回密码成功）
-    user_ip = get_client_ip()
-    clear_unverified_email(user_ip, xl_email)
-
-    # 返回 token
-    access_token = create_access_token(identity=xl_email)
-
-    response = jsonify({
-        'code': 200,
-        'msg': '密码修改成功',
-    })
-
-    set_access_cookies(response, access_token)
-    
-    # 设置 cookie，不在返回体中设置
-    # response.set_cookie('xl_token', access_token, httponly=True) #, samesite='Strict') #, secure=True)
-
-    # 清空和验证码相关的 session
-    session.pop('verification_code', None)
-    session.pop('email', None)
-    session.pop('send_time', None)
-    session.pop('tried_times', None)
-
-    return response, 200
 
 # @@@@@@@@@@@@@WARNING@@@@@@@@@@@@ #
 # @@@@@@@@以下需要验证 token@@@@@@@ #
 # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ #
-
-# 修改密码
-'''
-> 传入：
-
-{
-    "xl_newpassword": "加密后的新密码"
-}
-
-> 返回
-
-json
-{
-    "code": 200,
-    "msg": "成功",
-}
-'''
-@app.route('/api/changePassword', methods=['POST'])
-@jwt_required()
-def changePassword():
-    payload = request.get_json(silent=True) or {}
-    xl_email = get_jwt_identity()
-    xl_newpassword = payload.get('xl_newpassword')
-    if not xl_newpassword:
-        return jsonify({
-            'code': 400,
-            'msg': '缺少参数'
-        }), 400
-
-    # 解密密码
-    xl_newpassword = myDecrypt.decryptPassword(xl_newpassword)
-
-    hashed_password = PasswordHasher().hash(xl_newpassword)
-
-    # 更新密码
-    tjSql.sqlUpdatePassword(xl_email, hashed_password)
-
-    return jsonify({
-        'code': 200,
-        'msg': '密码修改成功'
-    }), 200
 
 # 获取通知列表
 '''
@@ -1141,8 +300,6 @@ def changePassword():
 def findMyCommonMsgPublish():
     # 查询通知
     data = tjSql.sqlFindMyCommonMsgPublish()
-
-    # time.sleep(5) # 模拟网络延迟
 
     return jsonify({
         'code': 200,
@@ -1220,24 +377,10 @@ def downloadAttachmentByFileName():
 
     print("文件路径：", filePath)
 
-    # 读取文件
-    # with open(f'{ATTACHMENT_PATH}/{filePath}', 'rb') as f:
-    #     content = f.read()
-
     return jsonify({
         "code": 200,
         "location": MYCOS.generate_temporary_url(f"{ATTACHMENT_PATH}/{filePath}")
     })
-
-    # try:
-    #     content = MYCOS.download_as_bytes(target_link=f"{ATTACHMENT_PATH}/{filePath}")
-    #     return content
-    
-    # except Exception as e:
-    #     print(e)
-    #     return jsonify({
-    #         "content": e.__str__()
-    #     }), 400
 
 # 获取用户信息
 @app.route('/api/getUserInfo', methods=['POST'])
@@ -1293,10 +436,16 @@ def toggleReceiveNoti():
 @app.route('/api/logout', methods=['GET'])
 @jwt_required()
 def logout():
-    # 清除 cookie
+    # 清除本地 cookie，返回 URL 在 JSON 中，由前端处理重定向
+    idp_base = 'https://iam.xialing.icu' if PRODUCTION else 'http://localhost:5174'
+    return_url = FRONTEND_URL + '/'
+    idp_logout_url = idp_base + '/api/logout?return_url=' + urllib.parse.quote(return_url, safe='')
+
+    # 清除本地 JWT cookie
     response = jsonify({
         'code': 200,
-        'msg': '成功'
+        'msg': '成功',
+        'idp_logout_url': idp_logout_url
     })
 
     unset_access_cookies(response)

@@ -36,10 +36,10 @@
           </div>
           <div v-else style="display: flex; padding-bottom: 7px">
             <div class="edu-item">
-              <el-button link type="primary" @click="() => $router.push('/login')">登录</el-button>
+              <el-button link type="primary" @click="redirectToLogin">登录</el-button>
             </div>
             <div class="edu-item">
-              <el-button link type="primary" @click="() => $router.push('/register')">注册</el-button>
+              <el-button link type="primary" @click="redirectToRegister">注册</el-button>
             </div>
           </div>
             <div class="edu-item">
@@ -121,6 +121,8 @@
   import { ElMessage } from 'element-plus';
   import { get_csrf_token } from './utils/helpers';
 
+  const SSO_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:5174' : 'https://iam.xialing.icu';
+
   export default {
     data() {
       return {
@@ -129,9 +131,24 @@
         openAlertDialog: false,
       }
     },
-    created() {
+    async created() {
         if (window.innerWidth < 768) {
             this.$store.commit('setIsMobile', true)
+        }
+        // 初始化时向后端同步登录状态
+        try {
+            const res = await axios({
+                method: 'post',
+                url: '/api/getUserInfo',
+                headers: {
+                    'X-CSRF-TOKEN': get_csrf_token(document.cookie)
+                },
+                data: {}
+            });
+            this.$store.commit('login');
+            this.$store.commit('setUserInfo', res.data.data);
+        } catch (e) {
+            this.$store.commit('logout');
         }
         this.checkTokenTimely() // 定期检查 token 是否过期
     },
@@ -141,23 +158,27 @@
     },
     methods:
     {
+      redirectToLogin() {
+        globalThis.location.href = '/api/sso/login';
+      },
+      redirectToRegister() {
+        const returnUrl = encodeURIComponent(window.location.origin + '/api/sso/login');
+        globalThis.location.href = SSO_BASE_URL + '/register?return_url=' + returnUrl;
+      },
       async logout() {
-        // 清空 vuex 中的所有数据
         this.$store.commit('logout')
-        this.$router.push('/login')
-
-        // 让后端清除 cookie
-        try {
-          await axios({
+        const res = await axios({
           method: 'get',
           url: '/api/logout',
           headers: {
             'X-CSRF-TOKEN': get_csrf_token(document.cookie)
           },
         })
+        if (res.data.idp_logout_url) {
+          window.location.href = res.data.idp_logout_url;
         }
-        catch(error) {
-          console.log(error)
+        else {
+          window.location.href = '/api/sso/login';
         }
       },
       handleMenu()
@@ -183,7 +204,7 @@
             if (!error.response || error.response.status !== 500) { // 可能是 cookie 被手动删除了，或者 token 过期了
               this.openAlertDialog = true;  // 提示用户登录状态已过期
               this.$store.commit('logout');
-              this.$router.push('/login');
+              window.location.href = '/api/sso/login';
             }
             else {
               ElMessage({

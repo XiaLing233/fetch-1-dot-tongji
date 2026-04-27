@@ -5,7 +5,7 @@ const store = createStore({
     state() {
         return {
         isMobile: false, // 是否为移动端
-        isLoggedin: localStorage.getItem('isLoggedin') === 'true', // 是否登录
+        isLoggedin: false, // 是否登录
         // xl_token: '', // 登录后的token // 在 Cookie 中存储，不在这里
         userInfo: localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')) : {
             xl_nickname: '', // 昵称
@@ -21,11 +21,16 @@ const store = createStore({
         },
         login(state) {
             state.isLoggedin = true
-            localStorage.setItem('isLoggedin', 'true')
         },
         logout(state) {
             state.isLoggedin = false
-            localStorage.clear()
+            state.userInfo = {
+                xl_nickname: '',
+                xl_email: '',
+                xl_created_at: '',
+                xl_receive_noti: false,
+            }
+            localStorage.removeItem('userInfo')
         },
         setUserInfo(state, userInfo) {
             // console.log('setUserInfo', userInfo)

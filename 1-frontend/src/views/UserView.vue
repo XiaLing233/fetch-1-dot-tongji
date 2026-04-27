@@ -40,22 +40,8 @@
             ></el-switch>
             <el-divider />
             <h4>密码修改</h4>
-            <el-form
-                :model="password"
-                :rules="rules"
-                ref="password"
-                label-width="80px"
-            >
-                <el-form-item label="新密码" prop="new">
-                    <el-input v-model="password.new" show-password></el-input>
-                </el-form-item>
-                <el-form-item label="确认密码" prop="confirm">
-                    <el-input v-model="password.confirm" show-password></el-input>
-                </el-form-item>
-                <el-form-item>
-                    <el-button type="primary" @click="changePassword">确认修改</el-button>
-                </el-form-item>
-            </el-form>
+            <p>密码修改已迁移至统一认证平台。</p>
+            <el-button type="primary" @click="goToSSORecovery">前往修改密码</el-button>
             <el-divider />
             <h4>最近的 [{{ this.$store.state.userInfo.xl_login_log.length }}] 次登录记录</h4>
             <el-table
@@ -82,7 +68,6 @@
 <script>
 import axios from 'axios'
 import { ElMessage } from 'element-plus';
-import { passwordEncrypt } from '@/utils/xl_encrypt';
 import { get_csrf_token } from '@/utils/helpers';
 
 export default {
@@ -92,22 +77,6 @@ export default {
             password: {
                 new: '',
                 confirm: ''
-            },
-            rules: {
-                new: [
-                    { required: true, message: '请输入新密码', trigger: 'blur' },
-                    { min: 8, max: 20 , message: '密码长度在8-20个字符之间', trigger: 'blur' }
-                ],
-                confirm: [
-                    { required: true, message: '请再次输入密码', trigger: 'blur' },
-                    { validator: (rule, value, callback) => {
-                        if (value === this.password.new) {
-                            callback()
-                        } else {
-                            callback(new Error('两次输入的密码不一致'))
-                        }
-                    }, trigger: 'blur' }
-                ]
             }
         }
     },
@@ -124,7 +93,7 @@ export default {
                     grouping: true
                 })
                 this.$store.commit('logout')
-                this.$router.push('/login')
+                window.location.href = '/api/sso/login'
                 return
                 }
                 axios({
@@ -152,7 +121,7 @@ export default {
                     // 如果返回的状态码是 401，说明 token 过期了，需要重新登录
                     if (error.response.status === 401) {
                         this.$store.commit('logout')
-                        this.$router.push('/login')
+                        window.location.href = '/api/sso/login'
                         ElMessage({
                         message: '登录已过期',
                         grouping: true,
@@ -170,63 +139,9 @@ export default {
                 })
             })
         },
-        changePassword() {
-            this.$refs.password.validate((valid) => {
-                if (valid) {
-                    // 如果 cookie 为空，说明在另一个窗口退出了，这时候需要重新登录
-                    if (!document.cookie) {
-                        this.isLoading = false
-                        ElMessage({
-                            title: '提示',
-                            message: '您还未登录，请先登录',
-                            type: 'warning',
-                            grouping: true
-                        })
-                        this.$store.commit('logout')
-                        this.$router.push('/login')
-                        return
-                    }
-                    axios({
-                        url: '/api/changePassword',
-                        method: 'post',
-                        headers: {
-                            'X-CSRF-TOKEN': get_csrf_token(document.cookie)
-                        },
-                        data: {
-                            xl_newpassword: passwordEncrypt(this.password.new)
-                        }
-                        })
-                        .then(response => {
-                            // console.log(response)
-                            ElMessage({
-                                message: '修改成功',
-                                grouping: true,
-                                type: 'success'
-                            })
-                        })
-                        .catch(error => {
-                            console.log(error)
-                            if (error.response.status === 401) {
-                                this.$store.commit('logout')
-                                this.$router.push('/login')
-                                ElMessage({
-                                message: '登录已过期',
-                                grouping: true,
-                                type: 'error'
-                            })
-                            }
-                            else{
-                                ElMessage({
-                                    message: '网络错误，请稍后再试',
-                                    grouping: true,
-                                    type: 'error'
-                                })
-                            }
-                        })
-                } else {
-                    return false
-                }
-            })
+        goToSSORecovery() {
+            const ssoBase = window.location.hostname === 'localhost' ? 'http://localhost:5174' : 'https://iam.xialing.icu';
+            window.location.href = ssoBase + '/change-password';
         },
         getUserInfo() {
             if (!document.cookie) { // 因为其他 cookie 是 httpOnly 的，所以这里只需要判断 csrf_access_token
@@ -238,7 +153,7 @@ export default {
                     grouping: true
                 })
                 this.$store.commit('logout')
-                this.$router.push('/login')
+                window.location.href = '/api/sso/login'
                 return
             }
             axios({
@@ -257,7 +172,7 @@ export default {
                 console.log(error)
                 if (error.response.status === 401) {
                     this.$store.commit('logout')
-                    this.$router.push('/login')
+                    window.location.href = '/api/sso/login'
                     ElMessage({
                     message: '登录已过期',
                     grouping: true,

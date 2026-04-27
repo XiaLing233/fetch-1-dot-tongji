@@ -187,7 +187,7 @@
                 alert: {
                     title: '错误提示',
                     content: '',
-                    callback: () => this.$router.push('/login')
+                    callback: () => window.location.href = '/api/sso/login'
                 },
                 pagi: {
                     currentPage: 1,
@@ -275,7 +275,7 @@
                         // 如果返回的状态码是 401，说明 token 过期了，需要重新登录
                         if (err.response.status === 401) {
                             this.$store.commit('logout')
-                            this.$router.push('/login')
+                            window.location.href = '/api/sso/login'
                         }
 
                         this.isLoading = false
@@ -284,7 +284,7 @@
                 else
                 {
                     this.alert.content = "您还未登录，请先登录"
-                    this.alert.callback = () => this.$router.push('/login')
+                    this.alert.callback = () => window.location.href = '/api/sso/login'
                     this.openAlertDialog = true
                 }
             },
@@ -320,7 +320,7 @@
                     // 如果返回的状态码是 401，说明 token 过期了，需要重新登录
                     if (err.response.status === 401) {
                         this.$store.commit('logout')
-                        this.$router.push('/login')
+                        window.location.href = '/api/sso/login'
                     }
                     else if (err.response.status === 400) {
                         console.log(err)

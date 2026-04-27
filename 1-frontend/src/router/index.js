@@ -10,48 +10,6 @@ const router = createRouter({
       component: () => import('../views/HomeView.vue'),
     },
     {
-      path: '/login',
-      name: 'login',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import('../views/LoginView.vue'),
-      beforeEnter: (to, from, next) => {
-        if (store.state.isLoggedin) {
-          next({ name: 'home' });
-        }
-        else {
-          next();
-        }
-      }
-    },
-    {
-      path: '/register',
-      name: 'register',
-      component: () => import('../views/RegisterView.vue'),
-      beforeEnter: (to, from, next) => {
-        if (store.state.isLoggedin) {
-          next({ name: 'home' });
-        }
-        else {
-          next();
-        }
-      }
-    },
-    {
-      path: "/recovery",
-      name: "recovery",
-      component: () => import('../views/RecoveryView.vue'),
-      beforeEnter: (to, from, next) => {
-        if (store.state.isLoggedin) {
-          next({ name: 'home' });
-        }
-        else {
-          next();
-        }
-      }
-    },
-    {
       path: "/user",
       name: "user",
       component: () => import('../views/UserView.vue'),
@@ -60,7 +18,7 @@ const router = createRouter({
           next();
         }
         else {
-          next({ name: 'login' });
+          window.location.href = '/api/sso/login';
         }
       }
     },
