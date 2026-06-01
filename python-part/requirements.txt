@@ -18,7 +18,7 @@ Flask-JWT-Extended==4.7.1
 Flask-Mail==0.10.0
 Flask-Session==0.8.0
 gunicorn==23.0.0
-idna==3.10
+idna==3.15
 itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.2
