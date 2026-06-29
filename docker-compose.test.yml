@@ -7,6 +7,8 @@ services:
       MYSQL_ROOT_HOST: "%"
       TZ: Asia/Shanghai
     command: --default-time-zone=+08:00
+    volumes:
+      - ./sqls/init_test.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
     healthcheck:
       test: ["CMD", "mariadb-admin", "-uroot", "-ptest_pass", "ping", "-h", "localhost"]
       interval: 10s
@@ -22,12 +24,39 @@ services:
     container_name: ftj-test-backend
     environment:
       TZ: Asia/Shanghai
-      REDIS_HOST: test-redis
+      # 数据库
       DB_HOST: test-mariadb
       DB_PORT: "3306"
       DB_USER: root
       DB_PASSWORD: test_pass
       DB_NAME: tongjinoti_test
+      # Redis
+      REDIS_HOST: test-redis
+      REDIS_PORT: "6379"
+      # JWT & Session
+      JWT_SECRET_KEY: test-jwt-secret-key-at-least-32-bytes-long
+      FLASK_SESSION_SECRET: test-session-secret
+      # 加密
+      RSA_PRIVATE_KEY_PATH: /app/keys/web_login_pri.pem
+      AES_KEY: test-aes-key-16b
+      AES_IV: test-aes-iv-16bt
+      # SMTP（测试时不需要真实发送）
+      SMTP_HOST: localhost
+      SMTP_PORT: "465"
+      SMTP_USER: test@test.com
+      SMTP_PASS: test
+      SMTP_USER_BATCH: batch@test.com
+      SMTP_PASS_BATCH: test
+      # COS（测试不需要真实 COS）
+      COS_REGION: ap-tokyo
+      COS_SECRET_ID: test
+      COS_SECRET_KEY: test
+      COS_BUCKET: test
+      COS_DOMAIN: test.example.com
+      # Flask
+      PRODUCTION: "false"
+    volumes:
+      - ./backend/keys:/app/keys:ro
     command: ["pytest", "/app/tests/", "-v"]
     depends_on:
       test-mariadb:

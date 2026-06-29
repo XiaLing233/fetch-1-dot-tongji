@@ -25,9 +25,9 @@ def register():
     xl_password = request.json.get('xl_password')
     xl_veri_code = request.json.get('xl_veri_code')
 
-    err = validate_verification_flow(xl_email, xl_veri_code)
-    if err is not None:
-        return err
+    validation_error = validate_verification_flow(xl_email, xl_veri_code)
+    if validation_error is not None:
+        return validation_error
 
     if tjSql.sqlUserExist(xl_email):
         return err(400, '用户已注册，请登录')
@@ -81,9 +81,9 @@ def recovery():
     xl_password = request.json.get('xl_password')
     xl_veri_code = request.json.get('xl_veri_code')
 
-    err = validate_verification_flow(xl_email, xl_veri_code)
-    if err is not None:
-        return err
+    validation_error = validate_verification_flow(xl_email, xl_veri_code)
+    if validation_error is not None:
+        return validation_error
 
     if not tjSql.sqlUserExist(xl_email):
         return err(400, '用户不存在')

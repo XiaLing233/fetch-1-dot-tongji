@@ -66,20 +66,3 @@ class CosUpload():
 
         return url
 
-
-if __name__ == "__main__":
-    # 上传测试
-    # with open("./packages/upload_to_cos.py", 'rb') as f:
-    #     foo = qCloud()
-    #     foo.upload_from_bytes(f, "backup/upload_to_cos.py")
-    
-    # 下载测试
-    # try:
-    #     foo = CosUpload()
-    #     foo.download_as_bytes(target_link="backup/upload_to_cos1.py")
-    # except Exception as e:
-    #     print(e)
-
-    # 生成链接测试
-    foo = CosUpload()
-    foo.generate_temporary_url(key="backup/upload_to_cos.py")

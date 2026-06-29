@@ -19,14 +19,13 @@ DB_CONFIG = {
 class DB:
     """MySQL 连接上下文管理器。自动提交/回滚、关闭游标和连接。"""
 
-    def __init__(self, dictionary=True):
-        self.dictionary = dictionary
+    def __init__(self):
         self.conn = None
         self.cursor = None
 
     def __enter__(self):
         self.conn = mysql.connector.connect(**DB_CONFIG)
-        self.cursor = self.conn.cursor(dictionary=self.dictionary)
+        self.cursor = self.conn.cursor()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -41,9 +40,16 @@ class DB:
 
 # ----- 工具函数 ----- #
 
+_NOTICE_COLS = ['id', 'title', 'start_time', 'end_time', 'invalid_top_time',
+                'create_id', 'create_user', 'create_time', 'publish_time']
+
+
 def _format_notice_row(row):
-    """把一条通知记录的字段格式化。"""
-    item = dict(row)
+    """把一条通知记录的字段格式化（兼容 tuple 和 dict）。"""
+    if isinstance(row, dict):
+        item = dict(row)
+    else:
+        item = dict(zip(_NOTICE_COLS, row))
     for col in ('start_time', 'end_time', 'create_time', 'publish_time'):
         if item.get(col):
             item[col] = item[col].strftime("%Y-%m-%d %H:%M:%S")
@@ -160,8 +166,10 @@ def sqlFindNotices(page=1, page_size=20, search='', status=''):
         # 置顶通知（无筛选时）
         pinned = []
         if status != '置顶' and not search:
+            cols = ', '.join(_NOTICE_COLS)
             db.cursor.execute(
-                "SELECT * FROM notifications WHERE invalid_top_time > %s ORDER BY publish_time DESC",
+                f"SELECT {cols} FROM notifications"
+                " WHERE invalid_top_time > %s ORDER BY publish_time DESC",
                 (now,)
             )
             pinned = [_format_notice_row(r) for r in db.cursor.fetchall()]
@@ -170,7 +178,7 @@ def sqlFindNotices(page=1, page_size=20, search='', status=''):
         db.cursor.execute(
             f"SELECT COUNT(*) AS cnt FROM notifications WHERE {where}", params
         )
-        total = db.cursor.fetchone()['cnt'] + len(pinned)
+        total = db.cursor.fetchone()[0] + len(pinned)
 
         # 分页
         base_sql = (
@@ -210,6 +218,8 @@ def sqlFindMyCommonMsgPublishById(notification_id):
     with DB() as db:
         db.cursor.execute("SELECT * FROM notifications WHERE id = %s", (notification_id,))
         result = db.cursor.fetchall()
+        if not result:
+            return None
 
         attachments = sqlFindAttachmentByNotificationId(notification_id)
         attachment_list = []
@@ -231,8 +241,8 @@ def sqlFindMyCommonMsgPublishById(notification_id):
                 item['fileType'] = "other"
             attachment_list.append(item)
 
-    invalid_top_time = result[0][5].strftime("%Y-%m-%d %H:%M:%S") if result[0][5] else None
-    return {
+        invalid_top_time = result[0][5].strftime("%Y-%m-%d %H:%M:%S") if result[0][5] else None
+        return {
         'id': result[0][0],
         'title': result[0][1],
         'content': result[0][2],

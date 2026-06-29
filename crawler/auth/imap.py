@@ -100,20 +100,3 @@ class EmailVerifier:
         if self.mailbox:
             self.mailbox.logout()
             self.mailbox = None
-
-
-# Unit test
-if __name__ == "__main__":
-    import os
-
-    with EmailVerifier(
-        email_addr=os.getenv('IMAP_EMAIL', ''),
-        grant_code=os.getenv('IMAP_GRANTCODE', ''),
-        imap_server=os.getenv('IMAP_SERVER', 'imap.qq.com'),
-        imap_port=os.getenv('IMAP_PORT', '993'),
-    ) as verifier:
-        code = verifier.get_latest_verification_code()
-        if code:
-            print(f"Verification code: {code}")
-        else:
-            print("No verification code found.")

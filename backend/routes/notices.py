@@ -28,17 +28,16 @@ def listNotices():
 @jwt_required()
 def getNotice(id):
     data = tjSql.sqlFindMyCommonMsgPublishById(id)
+    if data is None:
+        from utils.response import err
+        return err(404, '通知不存在')
     return ok(data, '成功')
 
 
 @notices_bp.route('/api/attachments/<path:filename>/download', methods=['GET'])
 @jwt_required()
 def downloadAttachment(filename):
-    print("文件位置：", filename)
-
     filePath = myDecrypt.decryptFilePath(filename)
-    print("文件路径：", filePath)
-
     ATTACHMENT_PATH = current_app.config.get('ATTACHMENT_PATH', './1dot')
     return ok({
         "location": MYCOS.generate_temporary_url(f"{ATTACHMENT_PATH}/{filePath}")

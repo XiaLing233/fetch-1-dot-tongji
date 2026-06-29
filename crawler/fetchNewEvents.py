@@ -176,54 +176,14 @@ def processEvents(session, events):
             
 
 
-
-# ----- 测试环境 ----- #
-
-# 记录 dump Cookie
-# import json
-# with open("cookies.json", "w") as f:
-    # json.dump(session.cookies.get_dict(), f)
-
-# session = requests.Session()
-
-# 读取 dump Cookie
-# with open("cookies.json", "r") as f:
-    # cookies = json.load(f)
-    # session.cookies.update(cookies)
-
-# events = findMyCommonMsgPublish(session)
-
-# processEvents(session, events)
-
-# ----- 生产环境 ----- #
+# ----- 入口 ----- #
 
 if __name__ == "__main__":
-    #try:
-        session = loginout.login()
-        
-        events = findMyCommonMsgPublish(session)
+    session = loginout.login()
+    events = findMyCommonMsgPublish(session)
+    processEvents(session, events)
+    time.sleep(10)
+    loginout.logout(session)
+    print("现在是：", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    print("处理活动结束！")
 
-        processEvents(session, events)
-
-        # 退出登录
-        time.sleep(10) # 至少等待 10s 再退出登录
-        loginout.logout(session)
-
-        print("现在是：", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        print("处理活动结束！")
-        print("\n\n\n")
-
-
-# 调试
-# if __name__ == "__main__":
-#     session = login()
-
-#     while True:
-#         fileName = input()
-
-#         attachment = {
-#             "fileLacation": fileName,
-#             "test": True,
-#         }
-
-#         print(handleDownloadfile(session, attachment))"""

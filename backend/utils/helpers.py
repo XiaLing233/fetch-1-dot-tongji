@@ -28,6 +28,8 @@ def triedTooManyTimes():
 
 
 def checkEmailFormat(email):
+    if not email or not isinstance(email, str):
+        return False
     if re.match(r'^[a-zA-Z0-9._-]+@tongji\.edu\.cn$', email):
         return True
     return False
