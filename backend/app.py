@@ -4,11 +4,10 @@ import configparser
 import datetime
 import os
 
-import redis
 from flask import Flask
 from flask_jwt_extended import JWTManager
-from flask_mail import Mail
 from flask_session import Session
+from utils.redis_client import get_redis
 
 # ----- 配置 ----- #
 
@@ -18,10 +17,6 @@ CONFIG = configparser.ConfigParser()
 CONFIG.read('config.ini', encoding='utf-8')
 
 SECRET_KEY = CONFIG['JWT']['secret_key']
-SMTP_SERVER = CONFIG['Email']['smtp_server']
-SMTP_PORT = CONFIG['Email']['smtp_port']
-SMTP_USERNAME = CONFIG['Email']['smtp_username']
-SMTP_PASSWORD = CONFIG['Email']['smtp_password']
 SESSION_SECRET_KEY = CONFIG['Session']['secret_key']
 
 ATTACHMENT_PATH = CONFIG['Storage']['attachment_path']
@@ -45,22 +40,12 @@ def create_app():
 
     JWTManager(app)
 
-    # ----- 邮件 ----- #
-    app.config['MAIL_SERVER'] = SMTP_SERVER
-    app.config['MAIL_PORT'] = SMTP_PORT
-    app.config['MAIL_USERNAME'] = SMTP_USERNAME
-    app.config['MAIL_PASSWORD'] = SMTP_PASSWORD
-    app.config['MAIL_USE_SSL'] = True
-    Mail(app)
-
     # ----- Session (Redis) ----- #
     app.config['SESSION_TYPE'] = 'redis'
     app.config['SESSION_PERMANENT'] = False
     app.config['SESSION_USE_SIGNER'] = True
     app.config['SECRET_KEY'] = SESSION_SECRET_KEY
-    redis_host = os.getenv('REDIS_HOST', 'localhost')
-    redis_port = int(os.getenv('REDIS_PORT', '6379'))
-    app.config['SESSION_REDIS'] = redis.Redis(host=redis_host, port=redis_port, db=0)
+    app.config['SESSION_REDIS'] = get_redis()
     if PRODUCTION:
         app.config['SESSION_COOKIE_SECURE'] = True
         app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'

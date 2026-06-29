@@ -1,11 +1,12 @@
 """用户接口：个人信息、通知偏好、修改密码。"""
 
 from argon2 import PasswordHasher
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from db import tjSql
 from utils import crypto as myDecrypt
+from utils.response import ok, err
 
 users_bp = Blueprint('users', __name__)
 
@@ -17,13 +18,13 @@ def changePassword():
     xl_email = get_jwt_identity()
     xl_newpassword = payload.get('xl_newpassword')
     if not xl_newpassword:
-        return jsonify({'code': 400, 'msg': '缺少参数'}), 400
+        return err(400, '缺少参数')
 
     xl_newpassword = myDecrypt.decryptPassword(xl_newpassword)
     hashed_password = PasswordHasher().hash(xl_newpassword)
     tjSql.sqlUpdatePassword(xl_email, hashed_password)
 
-    return jsonify({'code': 200, 'msg': '密码修改成功'}), 200
+    return ok(msg='密码修改成功')
 
 
 @users_bp.route('/api/getUserInfo', methods=['POST'])
@@ -44,7 +45,7 @@ def getUserInfo():
         'xl_login_log': data_login,
     }
 
-    return jsonify({'code': 200, 'msg': '成功', 'data': data}), 200
+    return ok(data, '成功')
 
 
 @users_bp.route('/api/toggleReceiveNoti', methods=['POST'])
@@ -54,7 +55,7 @@ def toggleReceiveNoti():
     xl_email = get_jwt_identity()
     expect_option = payload.get('expect_option')
     if expect_option is None:
-        return jsonify({'code': 400, 'msg': '缺少参数'}), 400
+        return err(400, '缺少参数')
 
     tjSql.sqltoggleReceiveNoti(xl_email, expect_option)
-    return jsonify({'code': 200, 'msg': '成功'}), 200
+    return ok(msg='成功')

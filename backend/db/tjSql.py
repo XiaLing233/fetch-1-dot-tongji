@@ -190,58 +190,90 @@ def sqlFindMyCommonMsgTop():
 
 
 
-# 查询所有发布的通知，不返回内容
-# 先查询置顶的，再查询未置顶的
-def sqlFindMyCommonMsgPublish():
+def _format_notice_row(row):
+    """把一条通知记录的字段格式化。"""
+    item = dict(row)
+    for col in ('start_time', 'end_time', 'create_time', 'publish_time'):
+        if item.get(col):
+            item[col] = item[col].strftime("%Y-%m-%d %H:%M:%S")
+    if item.get('invalid_top_time'):
+        item['invalid_top_time'] = item['invalid_top_time'].strftime("%Y-%m-%d %H:%M:%S")
+
+    # status
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if item.get('invalid_top_time') and item['invalid_top_time'] > now:
+        item['status'] = "置顶"
+    elif item.get('end_time', '') > now:
+        item['status'] = "发布中"
+    else:
+        item['status'] = "已过期"
+    return item
+
+
+def sqlFindNotices(page=1, page_size=20, search='', status=''):
+    """
+    分页查询通知，支持标题搜索和状态筛选。
+    返回 (items, total_count)。
+    """
     conn = mysql.connector.connect(**DB_CONFIG)
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
 
-    # 先查询置顶的
-    result = sqlFindMyCommonMsgTop()
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # 再查询未置顶的
-    sql = (
-        "SELECT id, title, start_time, end_time, "
-        "invalid_top_time, create_id, create_user, "
-        "create_time, publish_time FROM notifications "
-        "WHERE invalid_top_time <= %s "
-        "OR invalid_top_time IS NULL "
-        "ORDER BY publish_time DESC" # 按照发布时间倒序排列，最新的在前
-    )
-    
-    print("执行的 SQL 语句是：", sql)
+    # 构建 WHERE 条件
+    where_parts = ["(invalid_top_time <= %s OR invalid_top_time IS NULL)"]
+    params = [now]
 
-    cursor.execute(sql, (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
-    
-    # 合并查询结果，字典
-    result += [dict(zip(cursor.column_names, row)) for row in cursor.fetchall()]
+    if search:
+        where_parts.append("title LIKE %s")
+        params.append(f"%{search}%")
 
-    # 把时间列转换为中文格式
-    for item in result:
-        item['start_time'] = item['start_time'].strftime("%Y-%m-%d %H:%M:%S")
-        item['end_time'] = item['end_time'].strftime("%Y-%m-%d %H:%M:%S")
-        item['create_time'] = item['create_time'].strftime("%Y-%m-%d %H:%M:%S")
-        item['publish_time'] = item['publish_time'].strftime("%Y-%m-%d %H:%M:%S")
-        if item['invalid_top_time'] != None:
-            item['invalid_top_time'] = item['invalid_top_time'].strftime("%Y-%m-%d %H:%M:%S")
+    if status == '置顶':
+        where_parts = ["invalid_top_time > %s"]
+        params = [now]
+    elif status == '发布中':
+        where_parts.append("end_time > %s")
+        params.append(now)
+    elif status == '已过期':
+        where_parts.append("end_time <= %s")
+        params.append(now)
 
-    # 增加一列表示状态
-    for item in result:
-        if item['end_time'] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
-            item['status'] = "发布中"
-        else:
-            item['status'] = "已过期"
-        
-        if item['invalid_top_time'] != None and item['invalid_top_time'] > datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"):
-            item['status'] = "置顶"
-    
-    print("查询到的通知数量是：", len(result))
-    # print("查询到的通知是：", result)
-    
+    where = " AND ".join(where_parts)
+
+    # 先查置顶（如果无状态筛选）
+    pinned = []
+    if status != '置顶' and not search:
+        cursor.execute(
+            "SELECT * FROM notifications WHERE invalid_top_time > %s ORDER BY publish_time DESC",
+            (now,)
+        )
+        pinned = [_format_notice_row(r) for r in cursor.fetchall()]
+
+    # COUNT
+    count_sql = f"SELECT COUNT(*) AS cnt FROM notifications WHERE {where}"
+    cursor.execute(count_sql, params)
+    total = cursor.fetchone()['cnt'] + len(pinned)
+
+    # 分页查询（非置顶部分）
+    base_sql = (
+        "SELECT id, title, start_time, end_time, invalid_top_time, "
+        "create_id, create_user, create_time, publish_time "
+        "FROM notifications WHERE {where} ORDER BY publish_time DESC "
+        "LIMIT %s OFFSET %s"
+    ).format(where=where)
+
+    params += [page_size, (page - 1) * page_size]
+    cursor.execute(base_sql, params)
+    items = [_format_notice_row(r) for r in cursor.fetchall()]
+
     cursor.close()
     conn.close()
 
-    return result
+    # 首页时置顶排最前面
+    result = pinned + items if page == 1 else items
+
+    print(f"[DB] 查询通知: page={page}, size={page_size}, search='{search}', status='{status}' → total={total}")
+    return result, total
 
 # 查询一个通知关联的所有附件 ID
 def sqlFindAttachmentByNotificationId(notification_id):

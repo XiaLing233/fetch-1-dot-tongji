@@ -1,11 +1,24 @@
-"""共享辅助函数：限流、邮件发送、IP 获取等。"""
+"""共享辅助函数：限流、邮件发送、认证、IP 获取等。"""
+
+import datetime as dt
+
+import pytz
+from argon2 import PasswordHasher
+from flask import session, jsonify
+from flask_jwt_extended import create_access_token, set_access_cookies
+
+from utils.redis_client import get_redis
+from utils.response import ok, err
+
+from utils import crypto
+from utils.email import enqueue_email
 
 import re
 import time
 import random
 import datetime
 
-from flask import request, session, current_app
+from flask import request, session
 
 
 # ----- 工具函数 ----- #
@@ -49,7 +62,7 @@ def get_client_ip():
 # ----- IP 限流 ----- #
 
 def check_ip_rate_limit(ip, action, max_attempts=5, block_time=3600):
-    redis_client = current_app.config['SESSION_REDIS']
+    redis_client = get_redis()
     block_key = f'ip_block:{action}:{ip}'
     attempt_key = f'ip_attempt:{action}:{ip}'
 
@@ -65,7 +78,7 @@ def check_ip_rate_limit(ip, action, max_attempts=5, block_time=3600):
 
 
 def record_ip_attempt(ip, action, max_attempts=5, block_time=3600):
-    redis_client = current_app.config['SESSION_REDIS']
+    redis_client = get_redis()
     attempt_key = f'ip_attempt:{action}:{ip}'
     block_key = f'ip_block:{action}:{ip}'
 
@@ -81,7 +94,7 @@ def record_ip_attempt(ip, action, max_attempts=5, block_time=3600):
 
 
 def clear_ip_attempts(ip, action):
-    redis_client = current_app.config['SESSION_REDIS']
+    redis_client = get_redis()
     attempt_key = f'ip_attempt:{action}:{ip}'
     redis_client.delete(attempt_key)
 
@@ -89,7 +102,7 @@ def clear_ip_attempts(ip, action):
 # ----- 邮件限流与滥用检测 ----- #
 
 def check_daily_email_limit(ip):
-    redis_client = current_app.config['SESSION_REDIS']
+    redis_client = get_redis()
     MAX_DAILY_EMAILS = 10
     today = datetime.datetime.now().strftime('%Y%m%d')
     daily_key = f'daily_email:{ip}:{today}'
@@ -103,7 +116,7 @@ def check_daily_email_limit(ip):
 
 
 def record_email_sent(ip, email):
-    redis_client = current_app.config['SESSION_REDIS']
+    redis_client = get_redis()
     today = datetime.datetime.now().strftime('%Y%m%d')
     daily_key = f'daily_email:{ip}:{today}'
     count = redis_client.incr(daily_key)
@@ -120,14 +133,14 @@ def record_email_sent(ip, email):
 
 
 def clear_unverified_email(ip, email):
-    redis_client = current_app.config['SESSION_REDIS']
+    redis_client = get_redis()
     today = datetime.datetime.now().strftime('%Y%m%d')
     unverified_key = f'unverified_emails:{ip}:{today}'
     redis_client.srem(unverified_key, email)
 
 
 def check_abuse_pattern(ip):
-    redis_client = current_app.config['SESSION_REDIS']
+    redis_client = get_redis()
     today = datetime.datetime.now().strftime('%Y%m%d')
     unverified_key = f'unverified_emails:{ip}:{today}'
     unverified_count = redis_client.scard(unverified_key)
@@ -135,3 +148,105 @@ def check_abuse_pattern(ip):
         print(f"[SECURITY] 检测到可疑行为: IP {ip} 有 {unverified_count} 封未验证邮件")
         return True, unverified_count
     return False, unverified_count
+
+
+# ----- 邮件发送 ----- #
+
+def send_email(to, subject, body):
+    """入队邮件任务到 Redis 队列，由消费者异步发送。"""
+    enqueue_email(to, subject, body)
+
+
+def send_email_verification(recEmail, token):
+    send_email(recEmail, '邮箱验证', f'''亲爱的用户：
+
+您好！感谢您注册我们的服务。
+
+您的验证码是：{token}
+
+请在10分钟内完成验证。出于安全考虑，请不要将验证码泄露给他人。
+
+如果这不是您的操作，请忽略此邮件。
+
+此致
+1.xialing.icu
+''')
+
+
+def send_email_recovery(recEmail, token):
+    send_email(recEmail, '找回密码', f'''亲爱的用户：
+
+您好！您正在尝试找回密码。
+
+您的验证码是：{token}
+
+请在10分钟内完成验证。出于安全考虑，请不要将验证码泄露给他人。
+
+如果这不是您的操作，请忽略此邮件。
+
+此致
+1.xialing.icu
+''')
+
+
+# ----- 认证公共逻辑 ----- #
+
+def decrypt_password(encrypted_password):
+    """RSA 解密密码。"""
+    return crypto.decryptPassword(encrypted_password)
+
+
+def hash_password(password):
+    """Argon2 哈希。"""
+    return PasswordHasher().hash(password)
+
+
+def verify_password(hashed, plain):
+    """验证 Argon2 密码，失败抛出异常。"""
+    return PasswordHasher().verify(hashed, plain)
+
+
+def validate_verification_flow(xl_email, xl_veri_code):
+    """
+    register / recovery 公共验证流程。
+    返回 None 表示通过，否则返回 (error_response, status_code)。
+    """
+    if triedTooManyTimes():
+        return err(429, '错误次数过多，请稍后再试')
+
+    if not checkEmailFormat(xl_email):
+        return err(400, '邮箱格式错误，只接受@tongji.edu.cn的邮箱')
+
+    if session.get('email') != xl_email:
+        return err(400, '邮箱与发送验证码时不一致')
+
+    if time.time() - session.get('send_time', 0) > 600:
+        return err(400, '验证码过期，请重新发送')
+
+    if session.get('verification_code') != xl_veri_code:
+        session['tried_times'] = session.get('tried_times', 0) + 1
+        return err(400, f'验证码错误，您还有{5 - session.get("tried_times")}次机会')
+
+    return None
+
+
+def issue_jwt_cookie(xl_email, success_msg, status_code=200):
+    """签发 JWT 并打包为带 cookie 的 response。"""
+    access_token = create_access_token(identity=xl_email)
+    response = jsonify({'code': status_code, 'msg': success_msg})
+    set_access_cookies(response, access_token)
+    return response, status_code
+
+
+def record_login(xl_email, ip):
+    """记录登录日志（北京时区）。"""
+    from db import tjSql
+    tz = pytz.timezone('Asia/Shanghai')
+    now = dt.datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+    tjSql.sqlUpdateLoginLog(xl_email, ip, now)
+
+
+def clear_auth_session():
+    """清除验证码相关 session。"""
+    for key in ('verification_code', 'email', 'send_time', 'tried_times'):
+        session.pop(key, None)

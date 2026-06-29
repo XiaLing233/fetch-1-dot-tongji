@@ -1,9 +1,9 @@
 <template>
     <div style="background-color: #f0f0f0; width: 100%; height: auto; margin-top: 20px;">
         <div v-if="this.$store.state.isLoggedin">
-        <el-alert 
-            title="初次使用? 点此开始新手引导" 
-            type="success" 
+        <el-alert
+            title="初次使用? 点此开始新手引导"
+            type="success"
             style="margin-top: 20px"
             @click="beginTour = true"
             @close.stop="handleClose"
@@ -31,7 +31,7 @@
         </div>
     </div>
         <el-table
-            :data="paginatedData"
+            :data="tableData"
             style="width: 100%; flex: 1;"
             :max-height="600"
             stripe
@@ -69,7 +69,7 @@
                 align="center"
                 >
                 <template #default="scope">
-                    <el-tag 
+                    <el-tag
                         :type="scope.row.status === '置顶' ? 'danger' : scope.row.status === '发布中' ? 'success' : 'info'"
                     >
                         {{ scope.row.status }}
@@ -133,13 +133,13 @@
                             <span class="notiAttachment" @click="downloadAttachmentByFileName(attachment.file_location_local)">{{ attachment.filename }}</span>
                         </div>
                      </div>
-                    
+
                 </li>
             </ol>
         </div>
     </el-scrollbar>
     </el-dialog>
-    <div 
+    <div
         v-loading.fullscreen.lock="isLoading"
         element-loading-text="Loading"></div>
     <!-- 导览区 -->
@@ -170,11 +170,10 @@
         data() {
             return {
                 tableData: [],
-                tempTableData: [],
                 openAlertDialog: false,
                 openNotiDialog: false,
                 search: '',
-                statusFilter: [], // 存储当前的状态筛选
+                statusFilter: [],
                 noti: {
                     title: '',
                     content: '',
@@ -199,31 +198,42 @@
             }
         },
         mounted() {
-            this.isLoading = true
-            axios({
-                url: '/api/findMyCommonMsgPublish',
-                method: 'get',
-            })
-            .then(res => {
-                this.isLoading = false
-                // console.log(res)
-                this.tableData = res.data.data
-                // 把时间戳转换为日期格式
-                this.tableData.forEach(row => {
-                    row.publish_time = new Date(row.publish_time).toLocaleDateString()
-                    row.end_time = new Date(row.end_time).toLocaleDateString()
-                })
-                this.pagi.total = this.tableData.length
-                this.tempTableData = this.tableData
-                // console.log(this.tableData)
-            })
-            .catch(err => {
-                this.isLoading = false
-                console.log(err)
-            })
+            this.fetchNotices()
         },
         methods:
         {
+            fetchNotices() {
+                this.isLoading = true
+                const params = {
+                    page: this.pagi.currentPage,
+                    pageSize: this.pagi.pageSize,
+                }
+                if (this.statusFilter.length > 0) {
+                    params.status = this.statusFilter[0]
+                }
+                if (this.search) {
+                    params.search = this.search
+                }
+                axios({
+                    url: '/api/findMyCommonMsgPublish',
+                    method: 'get',
+                    params,
+                })
+                .then(res => {
+                    this.isLoading = false
+                    const payload = res.data.data
+                    this.tableData = payload.items
+                    this.pagi.total = payload.totalCount
+                    this.tableData.forEach(row => {
+                        row.publish_time = new Date(row.publish_time).toLocaleDateString()
+                        row.end_time = new Date(row.end_time).toLocaleDateString()
+                    })
+                })
+                .catch(err => {
+                    this.isLoading = false
+                    console.log(err)
+                })
+            },
             defRowLevel(row) {
                 const invalid_top_time = new Date(row.row.invalid_top_time).getTime()
                 if (invalid_top_time > new Date().getTime()) {
@@ -236,7 +246,6 @@
             findMyCommonMsgPublishById(row) {
                 if (this.$store.state.isLoggedin) {
                     this.isLoading = true
-                    // 如果 cookie 为空，说明在另一个窗口退出了，这时候需要重新登录
                     if (!document.cookie) {
                         this.isLoading = false
                         ElMessage({
@@ -271,8 +280,7 @@
                             message: err.response.data.msg,
                             type: 'error'
                         })
-                        
-                        // 如果返回的状态码是 401，说明 token 过期了，需要重新登录
+
                         if (err.response.status === 401) {
                             this.$store.commit('logout')
                             this.$router.push('/login')
@@ -289,7 +297,6 @@
                 }
             },
             downloadAttachmentByFileName(filename) {
-                // 如果 cookie 为空，说明在另一个窗口退出了，这时候需要重新登录
                 if (!document.cookie) {
                     this.isLoading = false
                     ElMessage({
@@ -317,7 +324,6 @@
                 })
                 .catch(err => {
                     console.log(err)
-                    // 如果返回的状态码是 401，说明 token 过期了，需要重新登录
                     if (err.response.status === 401) {
                         this.$store.commit('logout')
                         this.$router.push('/login')
@@ -328,20 +334,22 @@
                         this.alert.callback = () => this.openAlertDialog = false;
                         this.openAlertDialog = true;
                     }
-                })       
+                })
                 },
             handleSizeChange(val) {
                 this.pagi.pageSize = val
+                this.pagi.currentPage = 1
+                this.fetchNotices()
             },
             handleCurrentChange(val) {
                 this.pagi.currentPage = val
+                this.fetchNotices()
             },
-            // 当表格的筛选条件发生变化的时候会触发该事件，参数的值是一个对象，对象的 key 是 column 的 columnKey，对应的 value 为用户选择的筛选条件的数组。
             handleFilter(filters) {
-                // console.log(filters)
-                const status = filters['statusColumn'] // 需要在 el-table-column 中设置 column-key 属性才可以，不然传入的是个动态的值，每次刷新可能会变，需要写一个静态的值才好
-                this.statusFilter = status // 保存当前的状态筛选
-                this.applyFilters()
+                const status = filters['statusColumn'] || []
+                this.statusFilter = status
+                this.pagi.currentPage = 1
+                this.fetchNotices()
             },
             handleClose() {
                 localStorage.setItem('hadTourBefore', 'true')
@@ -350,34 +358,9 @@
                 return this.$store.state.isLoggedin && localStorage.getItem('hadTourBefore') !== 'true'
             },
             handleSearch() {
-                this.applyFilters()
-            },
-            applyFilters() {
-                // 从原始数据开始筛选
-                let filteredData = this.tableData
-                
-                // 应用状态筛选
-                if (this.statusFilter.length > 0) {
-                    filteredData = filteredData.filter(row => this.statusFilter.includes(row.status))
-                }
-                
-                // 应用搜索筛选
-                if (this.search) {
-                    filteredData = filteredData.filter(row => row.title.includes(this.search))
-                }
-                
-                // 更新显示数据和分页信息
-                this.tempTableData = filteredData
-                this.pagi.total = this.tempTableData.length
                 this.pagi.currentPage = 1
-            }
-        },
-        computed: {
-            paginatedData() {
-                const start = (this.pagi.currentPage - 1) * this.pagi.pageSize
-                const end = start + this.pagi.pageSize
-                return this.tempTableData.slice(start, end)
-            }
+                this.fetchNotices()
+            },
         },
         components: {
             Search,
