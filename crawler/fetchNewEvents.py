@@ -12,27 +12,19 @@ import time  # 生成时间戳
 import datetime  # 生成时间
 from db.tjSql import sqlInsertNotification, sqlHaveRecorded, sqlInsertAttachment, sqlInsertRelation, sqlGetAllReceiveNotiUser, sqlUpdateNotification, sqlFindAttachmentById
 
-# 邮件
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.utils import formataddr
-import smtplib
-
 # COS
 from services.cos import CosUpload
 
 MYCOS = CosUpload()
 
+# 邮件队列（共享 backend 的 Redis）
+from utils.email import enqueue_email
+
 # ----- 配置（从环境变量读取）----- #
 
-SEND_EMAIL = os.getenv('SEND_EMAIL', '0') == '1'
+# 全局邮件开关：关闭时覆盖所有用户偏好，不发送任何通知邮件
+SEND_EMAIL_ENABLED = os.getenv('SEND_EMAIL_ENABLED', '0') == '1'
 STORE_PATH = os.getenv('STORE_PATH', './1dot')
-
-# 邮件
-SMTP_SERVER = os.getenv('SMTP_HOST', '')
-SMTP_PORT = int(os.getenv('SMTP_PORT', '465'))
-SMTP_USERNAME = os.getenv('SMTP_USER_BATCH', '')
-SMTP_PASSWORD = os.getenv('SMTP_PASS_BATCH', '')
 
 def debug_response(step, response):
     print("第", step, "步：\n")
@@ -109,44 +101,33 @@ def handleDownloadfile(session, attachment):
     return cosFilePath.replace(STORE_PATH + "/", "") # 返回相对路径
 
     
-# 发送新活动邮件
-# event 是一个元组，包含 title 和 content 等
+# 发送新活动邮件（通过 Redis 队列异步发送）
 def sendNotiEmail(event):
-    # 获取收件人列表，包含昵称和邮箱
     to_list = sqlGetAllReceiveNotiUser()
 
-    # 创建邮件
     for to in to_list:
-        msg = MIMEMultipart()
-        msg['From'] = formataddr(["琪露诺bot", SMTP_USERNAME])
-        msg['To'] = to["email"]
-        # 标题带同济大学可能会被拦截，把同济改成TJ
-        msg['Subject'] = "1系统发布了新内容：" + event['title']
-
-        # 邮件正文，HTML 格式
-        msg.attach(MIMEText(f"尊敬的 {to['nickname']}：", 'html'))
-        msg.attach(MIMEText(f"<br>通知标题：<b>{event['title']}</b><br>", 'html'))
-        msg.attach(MIMEText(event['content'], 'html'))
-
-        # 把附件名称加入邮件，不要附件内容
-        if (event['commonAttachmentList'] != []): # 有附件
-            msg.attach(MIMEText("<br>该通知包含以下" + str(len(event['commonAttachmentList'])) + "个附件: <br>", 'html'))
+        # 构建 HTML 正文
+        body_parts = [
+            f"尊敬的 {to['nickname']}：",
+            f"<br>通知标题：<b>{event['title']}</b><br>",
+            event['content'],
+        ]
+        if event.get('commonAttachmentList'):
+            body_parts.append(f"<br>该通知包含以下{len(event['commonAttachmentList'])}个附件: <br>")
             for attachment in event['commonAttachmentList']:
-                msg.attach(MIMEText(attachment['fileName'] + "<br>", 'html'))
+                body_parts.append(attachment['fileName'] + "<br>")
         else:
-            msg.attach(MIMEText("<br>该通知没有附件。", 'html'))
-        
-        # 结尾
-        msg.attach(MIMEText("<br>请您及时查看，谢谢！<br>琪露诺bot", 'html'))
+            body_parts.append("<br>该通知没有附件。")
+        body_parts.append("<br>请您及时查看，谢谢！<br>琪露诺bot")
 
-        # print(msg)
-        
-        # 发送邮件
-        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_USERNAME, to["email"], msg.as_string())
-            print("邮件发送成功！")
-            time.sleep(5) # 不要频繁请求
+        enqueue_email(
+            to=to['email'],
+            subject="1系统发布了新内容：" + event['title'],
+            body=''.join(body_parts),
+            use_batch=True,
+            is_html=True,
+        )
+        time.sleep(1)  # 入队间隔，避免瞬时冲击
 
 
 # 处理活动，写入数据库
@@ -170,8 +151,8 @@ def processEvents(session, events):
             sqlInsertNotification(event)
             print("插入通知成功！")
 
-            # 发送邮件
-            if SEND_EMAIL:
+            # 发送邮件（全局开关控制；开启时仍只发给 receive_noti=1 的用户）
+            if SEND_EMAIL_ENABLED:
                 try:
                     sendNotiEmail(event)
                 except Exception as e:

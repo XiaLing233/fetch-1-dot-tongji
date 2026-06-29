@@ -9,22 +9,28 @@ from email.mime.text import MIMEText
 import redis
 
 
-def create_mail_client():
-    """创建 SMTP 连接。"""
+def _create_client(use_batch=False):
+    """创建 SMTP 连接，use_batch=True 时使用批量发送账号。"""
     host = os.getenv('SMTP_HOST', 'localhost')
     port = int(os.getenv('SMTP_PORT', '465'))
-    user = os.getenv('SMTP_USER', '')
-    password = os.getenv('SMTP_PASS', '')
     nickname = os.getenv('SMTP_NICKNAME', '琪露诺bot')
+
+    if use_batch:
+        user = os.getenv('SMTP_USER_BATCH', '')
+        password = os.getenv('SMTP_PASS_BATCH', '')
+    else:
+        user = os.getenv('SMTP_USER', '')
+        password = os.getenv('SMTP_PASS', '')
 
     server = smtplib.SMTP_SSL(host, port)
     server.login(user, password)
     return server, user, nickname
 
 
-def send_one(server, smtp_user, nickname, task):
-    """发送单封邮件。"""
-    msg = MIMEText(task['body'], 'plain', 'utf-8')
+def _send_one(server, smtp_user, nickname, task):
+    """发送单封邮件，支持 HTML。"""
+    subtype = 'html' if task.get('is_html') else 'plain'
+    msg = MIMEText(task['body'], subtype, 'utf-8')
     msg['From'] = f'{nickname} <{smtp_user}>'
     msg['To'] = task['to']
     msg['Subject'] = task['subject']
@@ -42,19 +48,18 @@ def run_consumer():
 
     while True:
         try:
-            # BRPOP 阻塞等待，超时 30s 后重试
             result = r.brpop('email:queue', timeout=30)
             if result is None:
                 continue
 
             _, raw = result
             task = json.loads(raw)
-            server, user, nickname = create_mail_client()
-            send_one(server, user, nickname, task)
+            use_batch = task.get('use_batch', False)
+            server, user, nickname = _create_client(use_batch=use_batch)
+            _send_one(server, user, nickname, task)
             server.quit()
 
         except Exception as e:
-            # 发送失败：放回队列头部，稍后重试
             print(f"[EMAIL] 发送失败 ({e})，稍后重试")
             try:
                 r.lpush('email:queue', raw)
