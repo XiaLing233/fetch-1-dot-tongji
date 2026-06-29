@@ -1,26 +1,24 @@
 # Flask 后端 — 应用工厂
 
-import configparser
 import datetime
 import os
+
+from dotenv import load_dotenv
+load_dotenv()
 
 from flask import Flask
 from flask_jwt_extended import JWTManager
 from flask_session import Session
 from utils.redis_client import get_redis
 
-# ----- 配置 ----- #
+# ----- 配置（从环境变量读取）----- #
 
 PRODUCTION = os.getenv('PRODUCTION', 'true').lower() == 'true'
 
-CONFIG = configparser.ConfigParser()
-CONFIG.read('config.ini', encoding='utf-8')
-
-SECRET_KEY = CONFIG['JWT']['secret_key']
-SESSION_SECRET_KEY = CONFIG['Session']['secret_key']
-
-ATTACHMENT_PATH = CONFIG['Storage']['attachment_path']
-IMG_PATH = CONFIG['Storage']['img_path']
+SECRET_KEY = os.getenv('JWT_SECRET_KEY', '')
+SESSION_SECRET_KEY = os.getenv('FLASK_SESSION_SECRET', '')
+ATTACHMENT_PATH = os.getenv('STORE_PATH', './1dot')
+IMG_PATH = os.getenv('IMG_PATH', './data/background')
 
 
 def create_app():

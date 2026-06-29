@@ -1,0 +1,41 @@
+services:
+  test-mariadb:
+    image: mariadb:lts
+    container_name: ftj-test-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: test_pass
+      MYSQL_ROOT_HOST: "%"
+      TZ: Asia/Shanghai
+    command: --default-time-zone=+08:00
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "-uroot", "-ptest_pass", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  test-redis:
+    image: redis:8.4-alpine
+    container_name: ftj-test-redis
+
+  test-backend:
+    build: ./backend
+    container_name: ftj-test-backend
+    environment:
+      TZ: Asia/Shanghai
+      REDIS_HOST: test-redis
+      DB_HOST: test-mariadb
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: test_pass
+      DB_NAME: tongjinoti_test
+    command: ["pytest", "/app/tests/", "-v"]
+    depends_on:
+      test-mariadb:
+        condition: service_healthy
+      test-redis:
+        condition: service_started
+    restart: "no"
+
+networks:
+  default:
+    name: ftj_test_network

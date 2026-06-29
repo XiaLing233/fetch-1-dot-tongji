@@ -1,10 +1,7 @@
 # 获取 1 系统新发布的活动
 # 并将其存储到本地
 
-import sys
 import os
-# 添加 backend 目录到 sys.path，以便引用共享模块
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 from auth import encrypt  # 用于加密密码
 from auth import loginout
@@ -84,14 +81,6 @@ def handleDownloadfile(session, attachment):
 
     # 下载附件
     response = session.get(download_url)
-
-    # 保存到本地
-    # localFilePath = STORE_PATH + "/" + attachment['fileLacation'].split('/')[-1] # 要和返回的 key 对应，不要乱起名
-
-    # with open(localFilePath, "wb") as f:
-    #     f.write(response.content)
-
-    # return localFilePath.replace(STORE_PATH + "/", "") # 返回相对路径
 
     cosFilePath = f"{STORE_PATH}/{attachment['fileLacation'].split('/')[-1]}"
     print(cosFilePath)

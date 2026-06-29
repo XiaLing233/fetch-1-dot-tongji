@@ -1,21 +1,18 @@
 # 和腾讯云 COS 有关的文件
 
-import configparser
+import os
 from qcloud_cos import CosConfig, CosS3Client
 from qcloud_cos.streambody import StreamBody
 from qcloud_cos import CosServiceError
 from urllib3.response import HTTPResponse
 
-CONFIG = configparser.ConfigParser()
-CONFIG.read('config.ini')
-
 class CosUpload():
     def __init__(self):
-        region = CONFIG["QCloud"]["region"]
-        secret_id = CONFIG["QCloud"]["secret_id"]
-        secret_key = CONFIG["QCloud"]["secret_key"]
-        domain = CONFIG["QCloud"]["domain"]
-        self.bucket_name = CONFIG["QCloud"]["bucket_name"]
+        region = os.getenv('COS_REGION', 'ap-tokyo')
+        secret_id = os.getenv('COS_SECRET_ID', '')
+        secret_key = os.getenv('COS_SECRET_KEY', '')
+        domain = os.getenv('COS_DOMAIN', '')
+        self.bucket_name = os.getenv('COS_BUCKET', '')
 
         config = CosConfig(Region=region, 
                            SecretId=secret_id, 

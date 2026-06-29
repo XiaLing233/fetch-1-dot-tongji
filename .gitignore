@@ -1,15 +1,22 @@
+# 配置 & 密钥
 config.ini
+.env
+keys/
+
+# 虚拟环境
 .venv
 venv/
 __pycache__
-node_modules
 
-keys/
-# encrypt logic
-# 1-frontend/src/utils/xl_encrypt.js
+# 依赖
+node_modules
 
 # 测试代码
 private/
 testconfig.py
 
+# 日志
 *.log
+
+# Docker
+mariadb_data/
