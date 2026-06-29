@@ -1,0 +1,14 @@
+beautifulsoup4==4.13.3
+certifi==2024.12.14
+charset-normalizer==3.4.1
+cos_python_sdk_v5==1.9.36
+idna==3.15
+mysql-connector-python==9.2.0
+pycryptodome==3.21.0
+pytz==2024.2
+redis==5.2.1
+requests==2.33.0
+soupsieve==2.6
+urllib3==2.7.0
+xmltodict==0.14.2
+pytest==8.3.5
