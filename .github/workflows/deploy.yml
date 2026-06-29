@@ -11,11 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run tests
-        run: docker compose -f docker-compose.test.yml up --build test-backend --exit-code-from test-backend
-      - name: Show logs on failure
-        if: failure()
+      - run: docker compose -f docker-compose.test.yml up --build test-backend --exit-code-from test-backend
+      - if: failure()
         run: docker compose -f docker-compose.test.yml logs test-backend
+
+  crawler-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker-compose.test.yml up --build test-crawler --exit-code-from test-crawler
+      - if: failure()
+        run: docker compose -f docker-compose.test.yml logs test-crawler
 
   frontend-test:
     runs-on: ubuntu-latest
@@ -31,7 +37,7 @@ jobs:
       - run: npm run build
 
   changes:
-    needs: [backend-test, frontend-test]
+    needs: [backend-test, crawler-test, frontend-test]
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     outputs:

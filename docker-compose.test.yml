@@ -57,12 +57,34 @@ services:
       PRODUCTION: "false"
     volumes:
       - ./backend/keys:/app/keys:ro
+      - ./backend/data/background:/app/data/background:ro
     command: ["pytest", "/app/tests/", "-v"]
     depends_on:
       test-mariadb:
         condition: service_healthy
       test-redis:
         condition: service_started
+    restart: "no"
+
+  test-crawler:
+    build: ./crawler
+    container_name: ftj-test-crawler
+    environment:
+      DB_HOST: test-mariadb
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: test_pass
+      DB_NAME: tongjinoti_test
+      COS_REGION: ap-tokyo
+      COS_SECRET_ID: test
+      COS_SECRET_KEY: test
+      COS_BUCKET: test
+      COS_DOMAIN: test.example.com
+    command: ["-m", "pytest", "/app/tests/", "-v"]
+    entrypoint: ["python3"]
+    depends_on:
+      test-mariadb:
+        condition: service_healthy
     restart: "no"
 
 networks:

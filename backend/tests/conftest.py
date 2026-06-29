@@ -39,24 +39,3 @@ def auth_client(client):
     client.set_cookie(key='xl_token', value=token, domain='localhost')
     return client
 
-
-_noti_counter = 0
-
-
-@pytest.fixture()
-def sample_notification():
-    """示例通知数据（每次调用生成唯一 ID）。"""
-    global _noti_counter
-    _noti_counter += 1
-    return {
-        'id': 90000 + _noti_counter,
-        'title': f'测试通知标题-{_noti_counter}',
-        'content': '<p>测试内容</p>',
-        'startTime': '2025-01-01 00:00:00',
-        'endTime': '2099-01-01 00:00:00',
-        'invalidTopTime': None,
-        'createId': 'test001',
-        'createUser': '测试用户',
-        'createTime': '2025-01-01 00:00:00',
-        'publishTime': '2025-01-01 00:00:00',
-    }

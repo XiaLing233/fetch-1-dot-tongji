@@ -2,8 +2,13 @@
 
 import os
 import time
+import uuid
 
 from db import tjSql
+
+
+def _uid():
+    return uuid.uuid4().hex[:8]
 
 
 def _encrypt_password(plaintext):
@@ -34,9 +39,8 @@ def _setup_session(client, email):
 
 class TestRegister:
     def test_register_success(self, client):
-        email = 'newuser@tongji.edu.cn'
+        email = f'test{_uid()}@tongji.edu.cn'
         _setup_session(client, email)
-
         encrypted = _encrypt_password('testpassword123')
         resp = client.post('/api/auth/register', json={
             'xl_email': email,
@@ -53,9 +57,8 @@ class TestRegister:
         assert resp.status_code == 400
 
     def test_register_wrong_verification_code(self, client):
-        email = 'wrongcode@tongji.edu.cn'
+        email = f'test{_uid()}@tongji.edu.cn'
         _setup_session(client, email)
-
         resp = client.post('/api/auth/register', json={
             'xl_email': email,
             'xl_password': 'ignored',
@@ -65,10 +68,9 @@ class TestRegister:
         assert '验证码错误' in resp.json['msg']
 
     def test_register_email_mismatch(self, client):
-        _setup_session(client, 'session@tongji.edu.cn')
-
+        _setup_session(client, f's{_uid()}@tongji.edu.cn')
         resp = client.post('/api/auth/register', json={
-            'xl_email': 'different@tongji.edu.cn',
+            'xl_email': f'd{_uid()}@tongji.edu.cn',
             'xl_password': 'ignored',
             'xl_veri_code': '123456',
         })
@@ -76,10 +78,9 @@ class TestRegister:
         assert '不一致' in resp.json['msg']
 
     def test_register_duplicate(self, client):
-        email = 'duplicate@tongji.edu.cn'
-        tjSql.sqlInsertUser('dup', email, 'hash', '2025-01-01 00:00:00')
+        email = f'dup{_uid()}@tongji.edu.cn'
+        tjSql.sqlInsertUser(f'dup{_uid()}', email, 'hash', '2025-01-01 00:00:00')
         _setup_session(client, email)
-
         resp = client.post('/api/auth/register', json={
             'xl_email': email,
             'xl_password': 'ignored',
@@ -100,7 +101,6 @@ class TestLogin:
 
     def test_login_missing_fields(self, client):
         resp = client.post('/api/auth/login', json={})
-        # 可能因同 IP 多次请求触发限流
         assert resp.status_code in (400, 403)
         if resp.status_code == 400:
             assert '用户名或密码错误' in resp.json['msg']
@@ -108,10 +108,9 @@ class TestLogin:
 
 class TestRecovery:
     def test_recovery_wrong_code(self, client):
-        email = 'recover@tongji.edu.cn'
-        tjSql.sqlInsertUser('rec', email, 'old_hash', '2025-01-01 00:00:00')
+        email = f'rec{_uid()}@tongji.edu.cn'
+        tjSql.sqlInsertUser(f'rec{_uid()}', email, 'old_hash', '2025-01-01 00:00:00')
         _setup_session(client, email)
-
         resp = client.put('/api/auth/password/reset', json={
             'xl_email': email,
             'xl_password': 'ignored',
@@ -121,9 +120,8 @@ class TestRecovery:
         assert '验证码错误' in resp.json['msg']
 
     def test_recovery_user_not_exist(self, client):
-        email = 'no-recover@tongji.edu.cn'
+        email = f'norec{_uid()}@tongji.edu.cn'
         _setup_session(client, email)
-
         resp = client.put('/api/auth/password/reset', json={
             'xl_email': email,
             'xl_password': 'ignored',
@@ -133,10 +131,9 @@ class TestRecovery:
         assert '用户不存在' in resp.json['msg']
 
     def test_recovery_email_mismatch(self, client):
-        email = 'recover2@tongji.edu.cn'
-        tjSql.sqlInsertUser('rec2', email, 'old_hash', '2025-01-01 00:00:00')
-        _setup_session(client, 'other@tongji.edu.cn')
-
+        email = f'rec2{_uid()}@tongji.edu.cn'
+        tjSql.sqlInsertUser(f'rec2{_uid()}', email, 'old_hash', '2025-01-01 00:00:00')
+        _setup_session(client, f'other{_uid()}@tongji.edu.cn')
         resp = client.put('/api/auth/password/reset', json={
             'xl_email': email,
             'xl_password': 'ignored',

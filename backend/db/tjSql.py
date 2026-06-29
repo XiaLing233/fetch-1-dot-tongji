@@ -38,6 +38,12 @@ class DB:
         self.conn.close()
 
 
+def sqlHaveRecorded(notification_id):
+    with DB() as db:
+        db.cursor.execute("SELECT * FROM notifications WHERE id = %s", (notification_id,))
+        return len(db.cursor.fetchall()) > 0
+
+
 # ----- 工具函数 ----- #
 
 _NOTICE_COLS = ['id', 'title', 'start_time', 'end_time', 'invalid_top_time',

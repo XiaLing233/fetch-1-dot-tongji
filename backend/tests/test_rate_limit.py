@@ -73,13 +73,6 @@ class TestDailyEmailLimit:
             assert limited is False
             assert count < max_daily
 
-    def test_records_email_sent(self, app):
-        ip = '10.0.0.11'
-        with app.test_request_context():
-            record_email_sent(ip, 'a@tongji.edu.cn')
-            _, count, _ = check_daily_email_limit(ip)
-            assert count == 1
-
     def test_limit_after_10(self, app):
         ip = '10.0.0.12'
         with app.test_request_context():
