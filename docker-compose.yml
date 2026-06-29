@@ -22,6 +22,7 @@ services:
     restart: always
 
   backend:
+    image: ghcr.io/xialing233/fetch-1-dot-tongji-backend:latest
     build: ./backend
     container_name: ftj-backend
     env_file: .env
@@ -45,6 +46,7 @@ services:
     restart: always
 
   frontend:
+    image: ghcr.io/xialing233/fetch-1-dot-tongji-frontend:latest
     build: ./frontend
     container_name: ftj-frontend
     ports:
@@ -54,7 +56,9 @@ services:
     restart: always
 
   email-consumer:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: services/Dockerfile
     container_name: ftj-email-consumer
     env_file: .env
     environment:
@@ -67,9 +71,8 @@ services:
     restart: always
 
   crawler:
-    build:
-      context: .
-      dockerfile: crawler/Dockerfile
+    image: ghcr.io/xialing233/fetch-1-dot-tongji-crawler:latest
+    build: ./crawler
     env_file: .env
     environment:
       TZ: Asia/Shanghai

@@ -66,67 +66,6 @@ def _format_notice_row(row):
     return item
 
 
-# ----- 通知 ----- #
-
-def sqlUpdateNotification(notification):
-    with DB() as db:
-        sql = (
-            "UPDATE notifications SET"
-            " title = %s, content = %s, start_time = %s,"
-            " end_time = %s, invalid_top_time = %s, create_id = %s,"
-            " create_user = %s, create_time = %s, publish_time = %s"
-            " WHERE id = %s"
-        )
-        db.cursor.execute(sql, (
-            notification["title"], notification["content"],
-            notification["startTime"], notification["endTime"],
-            notification["invalidTopTime"], notification["createId"],
-            notification["createUser"], notification["createTime"],
-            notification["publishTime"], notification["id"],
-        ))
-
-
-def sqlInsertNotification(notification):
-    with DB() as db:
-        sql = (
-            "INSERT INTO notifications"
-            " (id, title, content, start_time, end_time, invalid_top_time,"
-            "  create_id, create_user, create_time, publish_time)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-        )
-        db.cursor.execute(sql, (
-            notification["id"], notification["title"], notification["content"],
-            notification["startTime"], notification["endTime"], notification["invalidTopTime"],
-            notification["createId"], notification["createUser"], notification["createTime"],
-            notification["publishTime"],
-        ))
-
-
-def sqlInsertAttachment(attachment, localFilePath):
-    with DB() as db:
-        sql = (
-            "INSERT INTO attachments"
-            " (id, filename, file_location_remote, file_location_local)"
-            " VALUES (%s, %s, %s, %s)"
-        )
-        db.cursor.execute(sql, (
-            attachment["id"], attachment["fileName"],
-            attachment["fileLacation"], localFilePath,
-        ))
-
-
-def sqlInsertRelation(notification_id, attachment_id):
-    with DB() as db:
-        sql = "INSERT INTO relations (notification_id, attachment_id) VALUES (%s, %s)"
-        db.cursor.execute(sql, (notification_id, attachment_id))
-
-
-def sqlHaveRecorded(notification_id):
-    with DB() as db:
-        db.cursor.execute("SELECT * FROM notifications WHERE id = %s", (notification_id,))
-        return len(db.cursor.fetchall()) > 0
-
-
 def sqlFindMyCommonMsgTop():
     with DB() as db:
         sql = (

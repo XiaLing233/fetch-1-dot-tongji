@@ -3,18 +3,17 @@
 
 import os
 
-from auth import encrypt  # 用于加密密码
+from auth import encrypt
 from auth import loginout
-import time  # 生成时间戳
-import datetime  # 生成时间
-from db.tjSql import sqlInsertNotification, sqlHaveRecorded, sqlInsertAttachment, sqlInsertRelation, sqlGetAllReceiveNotiUser, sqlUpdateNotification, sqlFindAttachmentById
+import time
+import datetime
+from db.tjSql import (
+    sqlInsertNotification, sqlHaveRecorded, sqlInsertAttachment,
+    sqlInsertRelation, sqlGetAllReceiveNotiUser, sqlUpdateNotification,
+    sqlFindAttachmentById,
+)
 
-# COS
 from services.cos import CosUpload
-
-MYCOS = CosUpload()
-
-# 邮件队列（共享 backend 的 Redis）
 from utils.email import enqueue_email
 
 # ----- 配置（从环境变量读取）----- #
