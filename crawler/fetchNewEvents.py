@@ -3,15 +3,14 @@
 
 import sys
 import os
-# 添加 backend 目录到 sys.path，以便引用共享的 packages
+# 添加 backend 目录到 sys.path，以便引用共享模块
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-from packages import myEncrypt # 用于加密密码
-from packages import loginout
-import time # 生成时间戳
-import datetime # 生成时间
-import configparser # 读取配置文件
-from packages.tjSql import sqlInsertNotification, sqlHaveRecorded, sqlInsertAttachment, sqlInsertRelation, sqlGetAllReceiveNotiUser, sqlUpdateNotification, sqlFindAttachmentById # 用于写入数据库
+from auth import encrypt  # 用于加密密码
+from auth import loginout
+import time  # 生成时间戳
+import datetime  # 生成时间
+from db.tjSql import sqlInsertNotification, sqlHaveRecorded, sqlInsertAttachment, sqlInsertRelation, sqlGetAllReceiveNotiUser, sqlUpdateNotification, sqlFindAttachmentById
 
 # 邮件
 from email.mime.text import MIMEText
@@ -20,47 +19,20 @@ from email.utils import formataddr
 import smtplib
 
 # COS
-from packages.upload_to_cos import CosUpload
+from services.cos import CosUpload
 
 MYCOS = CosUpload()
 
-# 数据库
+# ----- 配置（从环境变量读取）----- #
 
-# 读取配置文件
-CONFIG = configparser.ConfigParser()
-CONFIG.read('config.ini')
-
-ENABLE_PROXY = CONFIG['Flag']['use_proxy'] == '1'
-SEND_EMAIL = CONFIG['Flag']['send_email'] == '1'
-
-# 代理
-if ENABLE_PROXY:
-    HTTP_PROXY = CONFIG['Proxy']['http']
-    HTTPS_PROXY = CONFIG['Proxy']['https']
-
-    # 配置 SOCKS5 代理
-    PROXIES = {
-        'http': HTTP_PROXY,
-        'https': HTTPS_PROXY
-    }
-
-# 存储文件的路径
-STORE_PATH = CONFIG['Storage']['attachment_path'] # 末尾没有斜杠
-
-# 学号
-STU_NO = CONFIG['Account']['sno']
+SEND_EMAIL = os.getenv('SEND_EMAIL', '0') == '1'
+STORE_PATH = os.getenv('STORE_PATH', './1dot')
 
 # 邮件
-SMTP_SERVER = CONFIG['Email']['smtp_server']
-SMTP_PORT = CONFIG['Email']['smtp_port']
-SMTP_USERNAME = CONFIG['Email']['smtp_username_batch'] # 是营销邮件，需要批量发送
-SMTP_PASSWORD = CONFIG['Email']['smtp_password_batch']
-
-# 加强认证
-IMAP_SERVER = CONFIG["IMAP"]["server_domain"]
-IMAP_PORT = CONFIG["IMAP"]["server_port"]
-IMAP_USERNAME =  CONFIG["IMAP"]["qq_emailaddr"]
-IMAP_PASSWORD =  CONFIG["IMAP"]["qq_grantcode"]
+SMTP_SERVER = os.getenv('SMTP_HOST', '')
+SMTP_PORT = int(os.getenv('SMTP_PORT', '465'))
+SMTP_USERNAME = os.getenv('SMTP_USER_BATCH', '')
+SMTP_PASSWORD = os.getenv('SMTP_PASS_BATCH', '')
 
 def debug_response(step, response):
     print("第", step, "步：\n")
@@ -84,17 +56,10 @@ def findMyCommonMsgPublish(session):
     # 发送请求
     msg_url = "https://1.tongji.edu.cn/api/commonservice/commonMsgPublish/findMyCommonMsgPublish"
 
-    if ENABLE_PROXY:
-        response = session.post(msg_url, data=req_body, proxies=PROXIES)
-    else:
-        response = session.post(msg_url, data=req_body)
+    response = session.post(msg_url, data=req_body)
 
     if (response.status_code == 200):
         print("请求成功！")
-        # 调试，输出到文件中
-        # with open("response.json", "w") as f:
-        #     f.write(response.text)
-
         return response.json()['data']['list'] # 返回活动列表
     else:
         print("请求失败！")
@@ -105,10 +70,7 @@ def findCommonMsgPublishById(session, id):
     # * 1000 是为了转换为毫秒级时间戳
     req_url = f"https://1.tongji.edu.cn/api/commonservice/commonMsgPublish/findCommonMsgPublishById?id={ id }&t={ int(time.time() * 1000) }"
 
-    if ENABLE_PROXY:
-        response = session.get(req_url, proxies=PROXIES)
-    else:
-        response = session.get(req_url)
+    response = session.get(req_url)
 
     if (response.status_code == 200):
         print("请求成功！")
@@ -124,15 +86,12 @@ def handleDownloadfile(session, attachment):
     download_url = "https://1.tongji.edu.cn/api/commonservice/obsfile/downloadfile?objectkey="
 
     # 对文件名进行加密
-    remotefilePath = myEncrypt.encryptFilePath(AES_URL, attachment['fileLacation']) # 要和返回的 key 对应，不要乱起名。我也很惊讶，但就是 Lacation...
+    remotefilePath = encrypt.encryptFilePath(AES_URL, attachment['fileLacation']) # 要和返回的 key 对应，不要乱起名。我也很惊讶，但就是 Lacation...
 
     download_url += remotefilePath
 
     # 下载附件
-    if ENABLE_PROXY:
-        response = session.get(download_url, proxies=PROXIES)
-    else:
-        response = session.get(download_url)
+    response = session.get(download_url)
 
     # 保存到本地
     # localFilePath = STORE_PATH + "/" + attachment['fileLacation'].split('/')[-1] # 要和返回的 key 对应，不要乱起名

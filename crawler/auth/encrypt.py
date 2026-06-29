@@ -1,5 +1,5 @@
 # 加密部分
-import configparser # 读取配置文件
+import os
 import requests # 网络请求
 from Crypto.PublicKey import RSA # RSA 加密
 from Crypto.Cipher import PKCS1_v1_5 # RSA 加密
@@ -7,42 +7,13 @@ from Crypto.Cipher import AES # AES 加密
 import base64 # base64 编码
 from urllib.parse import quote
 
-# 读取配置文件
-
-CONFIG = configparser.ConfigParser()
-CONFIG.read('config.ini')
-
-# 使用代理
-ENABLE_PROXY = CONFIG['Flag']['use_proxy'] == '1'
-
-# 账号密码认证部分
-STU_NO = CONFIG['Account']['sno']
-STU_PWD = CONFIG['Account']['passwd']
-
-# js 链接
-# RSA_URL = CONFIG['Js']['rsa_url'] # 动态获取
-# AES_URL = CONFIG['Js']['aes_url'] # 动态获取
-
-# 代理
-HTTP_PROXY = CONFIG['Proxy']['http']
-HTTPS_PROXY = CONFIG['Proxy']['https']
-
-# 配置 SOCKS5 代理
-PROXIES = {
-    'http': HTTP_PROXY,
-    'https': HTTPS_PROXY
-}
-
 # ----- 登录部分 ----- #
 
 # 读取 RSA 公钥
 def getRSAPublicKey(js_url):
     # js_url = RSA_URL
 
-    if ENABLE_PROXY:
-        response = requests.get(js_url, proxies=PROXIES, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
-    else:
-        response = requests.get(js_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
+    response = requests.get(js_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
 
     # 从 js 文件中提取公钥
     content = response.text
@@ -70,7 +41,7 @@ def encryptPassword(js_url):
 
     cipher = PKCS1_v1_5.new(public_key)
 
-    crypto = cipher.encrypt(STU_PWD.encode())
+    crypto = cipher.encrypt(os.getenv('TJ_PASSWD', '').encode())
 
     crypto = base64.b64encode(crypto)
     
@@ -83,10 +54,7 @@ def encryptPassword(js_url):
 def getAESKeyAndIV(js_url):
     # js_url = AES_URL
     
-    if ENABLE_PROXY:
-        response = requests.get(js_url, proxies=PROXIES, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'}) 
-    else:
-        response = requests.get(js_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
+    response = requests.get(js_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
 
     # 从 js 文件中提取密钥和 IV
     # 因为这个文件是混淆过的，所以用 , 来分行

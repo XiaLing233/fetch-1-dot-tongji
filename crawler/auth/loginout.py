@@ -1,5 +1,5 @@
-import configparser
 import json
+import os
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -8,17 +8,8 @@ from urllib.parse import urlencode, parse_qs, urlparse
 
 import requests
 
-from . import imap_email
-from . import myEncrypt
-
-
-CONFIG = configparser.ConfigParser()
-CONFIG.read("config.ini")
-
-IMAP_SERVER = CONFIG["IMAP"]["server_domain"]
-IMAP_PORT = CONFIG["IMAP"]["server_port"]
-IMAP_USERNAME = CONFIG["IMAP"]["qq_emailaddr"]
-IMAP_PASSWORD = CONFIG["IMAP"]["qq_grantcode"]
+from . import imap
+from . import encrypt
 
 
 class LoginState(Enum):
@@ -135,14 +126,14 @@ class SSOLoginStateMachine:
         if not self.ctx.rsa_url:
             raise RuntimeError("无法解析 RSA URL")
 
-        self.ctx.sp_auth_chain_code = myEncrypt.getspAuthChainCode(response.text)
+        self.ctx.sp_auth_chain_code = encrypt.getspAuthChainCode(response.text)
         self.ctx.state = LoginState.SUBMIT_PASSWORD
 
     def _submit_password(self) -> None:
         data = urlencode(
             {
-                "j_username": myEncrypt.STU_NO,
-                "j_password": myEncrypt.encryptPassword(self.ctx.rsa_url),
+                "j_username": os.getenv('TJ_SNO', ''),
+                "j_password": encrypt.encryptPassword(self.ctx.rsa_url),
                 "j_checkcode": "请输入验证码",
                 "op": "login",
                 "spAuthChainCode": self.ctx.sp_auth_chain_code,
@@ -187,7 +178,7 @@ class SSOLoginStateMachine:
             self.ctx.state = LoginState.AUTHN_ENGINE
 
     def _request_enhance_code(self) -> None:
-        data = urlencode({"j_username": myEncrypt.STU_NO, "type": "email"})
+        data = urlencode({"j_username": os.getenv('TJ_SNO', ''), "type": "email"})
 
         session = self.ctx.session
         session.headers.clear()
@@ -204,8 +195,11 @@ class SSOLoginStateMachine:
     def _submit_enhance_code(self) -> None:
         time.sleep(self.ctx.wait_seconds)
 
-        with imap_email.EmailVerifier(
-            IMAP_USERNAME, IMAP_PASSWORD, IMAP_SERVER, IMAP_PORT
+        with imap.EmailVerifier(
+            os.getenv('IMAP_EMAIL', ''),
+            os.getenv('IMAP_GRANTCODE', ''),
+            os.getenv('IMAP_SERVER', 'imap.qq.com'),
+            os.getenv('IMAP_PORT', '993'),
         ) as verifier:
             code = verifier.get_latest_verification_code()
 
@@ -214,7 +208,7 @@ class SSOLoginStateMachine:
 
         data = urlencode(
             {
-                "j_username": myEncrypt.STU_NO,
+                "j_username": os.getenv('TJ_SNO', ''),
                 "type": "email",
                 "sms_checkcode": code,
                 "popViewException": "Pop2",
@@ -351,7 +345,7 @@ def login() -> requests.Session | None:
 def logout(session: requests.Session) -> None:
     logout_data = {
         "sessionid": session.cookies.get_dict().get("sessionid", ""),
-        "uid": myEncrypt.STU_NO,
+        "uid": os.getenv('TJ_SNO', ''),
     }
 
     payload = json.dumps(logout_data, separators=(",", ":"))

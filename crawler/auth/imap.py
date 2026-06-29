@@ -104,19 +104,14 @@ class EmailVerifier:
 
 # Unit test
 if __name__ == "__main__":
-    import configparser
+    import os
 
-    # Read config
-    CONFIG = configparser.ConfigParser()
-    CONFIG.read('../config.ini')
-
-    # 加强认证
-    IMAP_SERVER = CONFIG["IMAP"]["server_domain"]
-    IMAP_PORT = CONFIG["IMAP"]["server_port"]
-    IMAP_USERNAME =  CONFIG["IMAP"]["qq_emailaddr"]
-    IMAP_PASSWORD =  CONFIG["IMAP"]["qq_grantcode"]
-
-    with EmailVerifier(IMAP_USERNAME, IMAP_PASSWORD, IMAP_SERVER, IMAP_PORT) as verifier:
+    with EmailVerifier(
+        email_addr=os.getenv('IMAP_EMAIL', ''),
+        grant_code=os.getenv('IMAP_GRANTCODE', ''),
+        imap_server=os.getenv('IMAP_SERVER', 'imap.qq.com'),
+        imap_port=os.getenv('IMAP_PORT', '993'),
+    ) as verifier:
         code = verifier.get_latest_verification_code()
         if code:
             print(f"Verification code: {code}")
