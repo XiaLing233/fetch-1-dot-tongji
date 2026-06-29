@@ -1,9 +1,24 @@
 """测试 fixtures：Flask 客户端、JWT token 生成。"""
 
+import os
 import datetime
 import pytest
 
 from app import create_app
+
+
+@pytest.fixture(scope='session')
+def rsa_keys(tmp_path_factory):
+    """生成临时 RSA 密钥对供测试使用。"""
+    from Crypto.PublicKey import RSA
+    key = RSA.generate(2048)
+    keys_dir = tmp_path_factory.mktemp('keys')
+    pub_path = keys_dir / 'pub.pem'
+    pri_path = keys_dir / 'pri.pem'
+    pub_path.write_bytes(key.publickey().export_key())
+    pri_path.write_bytes(key.export_key())
+    os.environ['RSA_PRIVATE_KEY_PATH'] = str(pri_path)
+    return str(pub_path), str(pri_path)
 
 
 @pytest.fixture(scope='session')

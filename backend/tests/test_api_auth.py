@@ -19,15 +19,6 @@ def _encrypt_password(plaintext):
     from urllib.parse import quote
 
     pub_path = os.getenv('RSA_PRIVATE_KEY_PATH', 'keys/web_login_pri.pem').replace('pri', 'pub')
-    if not os.path.exists(pub_path):
-        # Runner 环境没有密钥文件，生成临时密钥对
-        key = RSA.generate(2048)
-        with open(pub_path, 'wb') as f:
-            f.write(key.publickey().export_key())
-        priv_path = pub_path.replace('pub', 'pri')
-        if not os.path.exists(priv_path):
-            with open(priv_path, 'wb') as f:
-                f.write(key.export_key())
     with open(pub_path, 'r') as f:
         pub_key = RSA.import_key(f.read())
     cipher = PKCS1_v1_5.new(pub_key)
@@ -47,7 +38,7 @@ def _setup_session(client, email):
 
 
 class TestRegister:
-    def test_register_success(self, client):
+    def test_register_success(self, client, rsa_keys):
         email = f'test{_uid()}@tongji.edu.cn'
         _setup_session(client, email)
         encrypted = _encrypt_password('testpassword123')
