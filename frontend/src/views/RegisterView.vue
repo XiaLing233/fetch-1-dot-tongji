@@ -75,7 +75,6 @@
 import axios from 'axios'
 import { passwordEncrypt } from '@/utils/xl_encrypt';
 import { ElMessage } from 'element-plus';
-import { get_csrf_token } from '@/utils/helpers';
 
 export default {
     data() {

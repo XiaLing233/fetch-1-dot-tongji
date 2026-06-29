@@ -16,11 +16,14 @@ from db.tjSql import (
 from services.cos import CosUpload
 from utils.email import enqueue_email
 
+MYCOS = CosUpload()
+
 # ----- 配置（从环境变量读取）----- #
 
 # 全局邮件开关：关闭时覆盖所有用户偏好，不发送任何通知邮件
 SEND_EMAIL_ENABLED = os.getenv('SEND_EMAIL_ENABLED', '0') == '1'
 STORE_PATH = os.getenv('STORE_PATH', './1dot')
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', os.getenv('IMAP_EMAIL', ''))
 
 def debug_response(step, response):
     print("第", step, "步：\n")
@@ -177,12 +180,35 @@ def processEvents(session, events):
 
 # ----- 入口 ----- #
 
+def _notify_failure(error_msg):
+    """发送爬虫失败通知邮件。"""
+    if not ADMIN_EMAIL:
+        return
+    try:
+        enqueue_email(
+            to=ADMIN_EMAIL,
+            subject='[抓取失败] fetch-1-dot-tongji 爬虫异常',
+            body=f'爬虫执行失败：\n\n{error_msg}\n\n时间：{datetime.datetime.now()}',
+        )
+        print(f"已发送失败通知至 {ADMIN_EMAIL}")
+    except Exception as e:
+        print(f"发送失败通知时出错: {e}")
+
+
 if __name__ == "__main__":
-    session = loginout.login()
-    events = findMyCommonMsgPublish(session)
-    processEvents(session, events)
-    time.sleep(10)
-    loginout.logout(session)
-    print("现在是：", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    print("处理活动结束！")
+    try:
+        session, AES_URL = loginout.login()
+        if session is None:
+            _notify_failure("登录 1.tongji.edu.cn 失败")
+            exit(1)
+
+        events = findMyCommonMsgPublish(session)
+        processEvents(session, events)
+        time.sleep(10)
+        loginout.logout(session)
+        print("现在是：", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        print("处理活动结束！")
+    except Exception as e:
+        _notify_failure(str(e))
+        raise
 

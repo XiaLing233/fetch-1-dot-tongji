@@ -57,15 +57,24 @@ def getAESKeyAndIV(js_url):
     response = requests.get(js_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'})
 
     # 从 js 文件中提取密钥和 IV
-    # 因为这个文件是混淆过的，所以用 , 来分行
+    # 格式形如: r.enc.Utf8.parse("fCm^7p1AwqKPTNjn"), iv:r.enc.Utf8.parse("MaW5a2v%%I9em$UI")
+    import re
     content = response.text
-    for line in content.split(','):
-        if "iv:n.enc.Utf8.parse" in line:
-            iv = line.split("\"")[1] # 可能会有多个行都含有 iv，没关系，值是一样的
-        if "i=n.enc.Utf8.parse" in line:
-            key = line.split("\"")[1]
+    iv = None
+    key = None
 
-    return iv, key # 返回的是 ASCII 编码的 str
+    m = re.search(r'iv:\w\.enc\.Utf8\.parse\("([^"]+)"\)', content)
+    if m:
+        iv = m.group(1)
+
+    m = re.search(r'[=,]\w\.enc\.Utf8\.parse\("([^"]+)"\)', content)
+    if m:
+        key = m.group(1)
+
+    if not iv or not key:
+        raise RuntimeError("无法提取 AES key/iv，学校前端可能已更新")
+
+    return iv, key
 
 # 对数据进行 AES 加密
 def encryptFilePath(js_url, filePath):

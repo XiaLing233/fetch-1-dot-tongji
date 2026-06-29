@@ -34,7 +34,7 @@
             </el-dropdown>
             </div>
           </div>
-          <div v-else style="display: flex; padding-bottom: 7px">
+          <div v-else style="display: flex; align-items: center;">
             <div class="edu-item">
               <el-button link type="primary" @click="() => $router.push('/login')">登录</el-button>
             </div>
@@ -42,7 +42,7 @@
               <el-button link type="primary" @click="() => $router.push('/register')">注册</el-button>
             </div>
           </div>
-            <div class="edu-item">
+            <div class="edu-item" style="display: flex; align-items: center;">
               <el-dropdown>
                 <span class="el-dropdown-link">
                   关于
@@ -119,7 +119,6 @@
   import axios from 'axios';
   import malePNG from '@/assets/male.png';
   import { ElMessage } from 'element-plus';
-  import { get_csrf_token } from './utils/helpers';
 
   export default {
     data() {
@@ -151,9 +150,6 @@
           await axios({
           method: 'delete',
           url: '/api/auth/session',
-          headers: {
-            'X-CSRF-TOKEN': get_csrf_token(document.cookie)
-          },
         })
         }
         catch(error) {
@@ -173,9 +169,6 @@
             await axios({
             method: 'get',
             url: '/api/auth/check',
-            headers: {
-              'X-CSRF-TOKEN': get_csrf_token(document.cookie)
-            },
           })
           }
           catch(error) {

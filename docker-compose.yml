@@ -9,6 +9,7 @@ services:
     command: --default-time-zone=+08:00
     volumes:
       - mariadb_data:/var/lib/mysql
+      - ./sqls/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
     healthcheck:
       test: ["CMD", "mariadb-admin", "-uroot", "-p$MYSQL_ROOT_PASSWORD", "ping", "-h", "localhost"]
       interval: 10s
@@ -56,15 +57,12 @@ services:
     restart: always
 
   email-consumer:
-    build:
-      context: ./backend
-      dockerfile: services/Dockerfile
+    build: ./email-consumer
     container_name: ftj-email-consumer
     env_file: .env
     environment:
       TZ: Asia/Shanghai
       REDIS_HOST: redis
-    command: ["python3", "-u", "services/email_consumer.py"]
     depends_on:
       redis:
         condition: service_started

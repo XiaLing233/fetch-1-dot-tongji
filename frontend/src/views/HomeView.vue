@@ -164,7 +164,6 @@
     import { urlEncrypt } from '@/utils/xl_encrypt';
     import { ElMessage } from 'element-plus';
     import { Search } from '@element-plus/icons-vue'
-    import { get_csrf_token } from '@/utils/helpers';
 
     export default {
         data() {
@@ -246,17 +245,6 @@
             findMyCommonMsgPublishById(row) {
                 if (this.$store.state.isLoggedin) {
                     this.isLoading = true
-                    if (!document.cookie) {
-                        this.isLoading = false
-                        ElMessage({
-                            title: '提示',
-                            message: '您还未登录，请先登录',
-                            type: 'warning',
-                            grouping: true
-                        })
-                        this.$store.commit('logout')
-                        return
-                    }
                     axios({
                         url: `/api/notices/${row.id}`,
                         method: 'get',
@@ -291,16 +279,6 @@
                 }
             },
             downloadAttachmentByFileName(filename) {
-                if (!document.cookie) {
-                    this.isLoading = false
-                    ElMessage({
-                        title: '提示',
-                        message: '您还未登录，请先登录',
-                        type: 'warning',
-                        grouping: true
-                    })
-                    return
-                }
                 let encryptedFilename = urlEncrypt(filename);
                 axios({
                     url: `/api/attachments/${encodeURIComponent(encryptedFilename)}/download`,

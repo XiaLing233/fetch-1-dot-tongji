@@ -337,9 +337,11 @@ class SSOLoginStateMachine:
         return auth_data.get("authnErrorTip", "").strip()
 
 
-def login() -> requests.Session | None:
+def login() -> tuple[requests.Session | None, str]:
+    """返回 (session, aes_url)。"""
     machine = SSOLoginStateMachine()
-    return machine.run()
+    session = machine.run()
+    return session, machine.ctx.aes_url
 
 
 def logout(session: requests.Session) -> None:

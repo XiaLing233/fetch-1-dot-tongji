@@ -83,7 +83,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus';
 import { passwordEncrypt } from '@/utils/xl_encrypt';
-import { get_csrf_token } from '@/utils/helpers';
 
 export default {
     data() {
@@ -114,25 +113,9 @@ export default {
     methods: {
         handleSwitch() {
             return new Promise((resolve) => {
-                // 如果 cookie 为空，说明手动删除了
-                if (!document.cookie) {
-                this.isLoading = false
-                ElMessage({
-                    title: '提示',
-                    message: '您还未登录，请先登录',
-                    type: 'warning',
-                    grouping: true
-                })
-                this.$store.commit('logout')
-                this.$router.push('/login')
-                return
-                }
                 axios({
                     url: '/api/users/me/notification',
                     method: 'post',
-                    headers: {
-                        'X-CSRF-TOKEN': get_csrf_token(document.cookie)
-                    },
                     data: {
                         expect_option: !this.now_option
                     }
@@ -173,25 +156,9 @@ export default {
         changePassword() {
             this.$refs.password.validate((valid) => {
                 if (valid) {
-                    // 如果 cookie 为空，说明在另一个窗口退出了，这时候需要重新登录
-                    if (!document.cookie) {
-                        this.isLoading = false
-                        ElMessage({
-                            title: '提示',
-                            message: '您还未登录，请先登录',
-                            type: 'warning',
-                            grouping: true
-                        })
-                        this.$store.commit('logout')
-                        this.$router.push('/login')
-                        return
-                    }
                     axios({
                         url: '/api/users/me/password',
                         method: 'put',
-                        headers: {
-                            'X-CSRF-TOKEN': get_csrf_token(document.cookie)
-                        },
                         data: {
                             xl_newpassword: passwordEncrypt(this.password.new)
                         }
@@ -229,18 +196,6 @@ export default {
             })
         },
         getUserInfo() {
-            if (!document.cookie) { // 因为其他 cookie 是 httpOnly 的，所以这里只需要判断 csrf_access_token
-                this.isLoading = false
-                ElMessage({
-                    title: '提示',
-                    message: '您还未登录，请先登录',
-                    type: 'warning',
-                    grouping: true
-                })
-                this.$store.commit('logout')
-                this.$router.push('/login')
-                return
-            }
             axios({
                 method: 'get',
                 url: '/api/users/me',

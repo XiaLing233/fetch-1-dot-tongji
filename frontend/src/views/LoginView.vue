@@ -39,11 +39,11 @@
                 </el-form>
                 <el-button link type="primary" @click="this.$router.push('/recovery')" style="float: left; margin-left: 80px; margin-bottom: 10px">忘记了密码？</el-button>
                 <el-card
-                    style="width: 400px; margin: 0 auto; display: flex; justify-content: center;"
+                    style="width: 400px; margin: 0 auto; text-align: center;"
                     shadow="never"
                 >
-                    <span style="text-align: center;">初次使用？</span>
-                    <span style="text-align: center;" class="register-link" @click="this.$router.push('/register')">点此注册</span>
+                    <span>初次使用？</span>
+                    <span class="register-link" @click="this.$router.push('/register')">点此注册</span>
                 </el-card>
             </el-card>
         </div>
@@ -56,7 +56,6 @@
 import axios from 'axios'
 import { passwordEncrypt } from '@/utils/xl_encrypt';
 import { ElMessage } from 'element-plus'; // 顶部提示
-import { get_csrf_token } from '@/utils/helpers';
 
 export default {
     data() {

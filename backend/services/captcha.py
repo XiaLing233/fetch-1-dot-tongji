@@ -48,14 +48,14 @@ class SimpleCaptcha:
         image = Image.new('RGB', (self.width, self.height), bg_color)
         draw = ImageDraw.Draw(image)
         
-        # 绘制背景干扰线（增加数量和粗细）
+        # 绘制背景干扰线
         for _ in range(random.randint(5, 8)):
             x1 = random.randint(0, self.width)
             y1 = random.randint(0, self.height)
             x2 = random.randint(0, self.width)
             y2 = random.randint(0, self.height)
             draw.line([(x1, y1), (x2, y2)], fill=self._random_color(150, 200), width=random.randint(1, 2))
-        
+
         # 绘制曲线干扰线
         for _ in range(random.randint(2, 3)):
             points = []
@@ -64,8 +64,8 @@ class SimpleCaptcha:
                 y = random.randint(0, self.height)
                 points.append((x, y))
             draw.line(points, fill=self._random_color(150, 200), width=1)
-        
-        # 绘制干扰点（增加数量）
+
+        # 绘制干扰点
         for _ in range(random.randint(100, 150)):
             x = random.randint(0, self.width)
             y = random.randint(0, self.height)
@@ -133,7 +133,7 @@ class SimpleCaptcha:
             x2 = random.randint(0, self.width)
             y2 = random.randint(0, self.height)
             draw.line([(x1, y1), (x2, y2)], fill=self._random_color(180, 220), width=1)
-        
+
         # 添加高斯模糊（轻微）
         image = image.filter(ImageFilter.GaussianBlur(radius=0.8))
         
