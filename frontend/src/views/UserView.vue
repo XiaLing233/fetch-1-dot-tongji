@@ -128,7 +128,7 @@ export default {
                 return
                 }
                 axios({
-                    url: '/api/toggleReceiveNoti',
+                    url: '/api/users/me/notification',
                     method: 'post',
                     headers: {
                         'X-CSRF-TOKEN': get_csrf_token(document.cookie)
@@ -187,8 +187,8 @@ export default {
                         return
                     }
                     axios({
-                        url: '/api/changePassword',
-                        method: 'post',
+                        url: '/api/users/me/password',
+                        method: 'put',
                         headers: {
                             'X-CSRF-TOKEN': get_csrf_token(document.cookie)
                         },
@@ -242,13 +242,8 @@ export default {
                 return
             }
             axios({
-                method: 'post',
-                url: '/api/getUserInfo',
-                credentials: 'same-origin',
-                headers: {
-                    'X-CSRF-TOKEN': get_csrf_token(document.cookie)
-                },
-                data: {}
+                method: 'get',
+                url: '/api/users/me',
             })
             .then(response => {
                     this.$store.commit('setUserInfo', response.data.data)

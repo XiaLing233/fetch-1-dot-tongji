@@ -215,7 +215,7 @@
                     params.search = this.search
                 }
                 axios({
-                    url: '/api/findMyCommonMsgPublish',
+                    url: '/api/notices',
                     method: 'get',
                     params,
                 })
@@ -258,14 +258,8 @@
                         return
                     }
                     axios({
-                        url: '/api/findMyCommonMsgPublishById',
-                        method: 'post',
-                        headers: {
-                            'X-CSRF-TOKEN': get_csrf_token(document.cookie)
-                        },
-                        data: {
-                            id: row.id
-                        }
+                        url: `/api/notices/${row.id}`,
+                        method: 'get',
                     })
                     .then(res => {
                         this.noti.title = res.data.data.title
@@ -309,17 +303,11 @@
                 }
                 let encryptedFilename = urlEncrypt(filename);
                 axios({
-                    url: '/api/downloadAttachmentByFileName',
-                    method: 'post',
-                    headers: {
-                        'X-CSRF-TOKEN': get_csrf_token(document.cookie)
-                    },
-                    data: {
-                        fileLocation: encryptedFilename
-                    },
+                    url: `/api/attachments/${encodeURIComponent(encryptedFilename)}/download`,
+                    method: 'get',
                 })
                 .then(res => {
-                    const url = res.data.location;
+                    const url = res.data.data.location;
                     window.open(url, '_blank');
                 })
                 .catch(err => {

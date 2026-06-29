@@ -92,7 +92,7 @@ export default {
             try {
                 await axios({
                     method: 'post',
-                    url: '/api/login',
+                    url: '/api/auth/login',
                     data: {
                         xl_email: this.form.xl_email + '@tongji.edu.cn',
                         xl_password: passwordEncrypt(this.form.xl_password)
@@ -120,13 +120,8 @@ export default {
         async getUserInfo() {
             try {
                 const response = await axios({
-                    method: 'post',
-                    url: '/api/getUserInfo',
-                    credentials: 'same-origin',
-                    headers: {
-                        'X-CSRF-TOKEN': get_csrf_token(document.cookie)
-                    },
-                    data: {}
+                    method: 'get',
+                    url: '/api/users/me',
                 })
                 this.$store.commit('setUserInfo', response.data.data)
                 // console.log("setUserInfo")
@@ -138,7 +133,7 @@ export default {
     },
     mounted() {
         if (1) {
-            axios.get('/api/getBackgroundImg')
+            axios.get('/api/background')
             .then(response => {
                 this.backgroundPic = response.data.data
             })

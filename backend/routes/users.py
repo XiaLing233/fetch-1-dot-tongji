@@ -11,7 +11,7 @@ from utils.response import ok, err
 users_bp = Blueprint('users', __name__)
 
 
-@users_bp.route('/api/changePassword', methods=['POST'])
+@users_bp.route('/api/users/me/password', methods=['PUT'])
 @jwt_required()
 def changePassword():
     payload = request.get_json(silent=True) or {}
@@ -27,7 +27,7 @@ def changePassword():
     return ok(msg='密码修改成功')
 
 
-@users_bp.route('/api/getUserInfo', methods=['POST'])
+@users_bp.route('/api/users/me', methods=['GET'])
 @jwt_required()
 def getUserInfo():
     xl_email = get_jwt_identity()
@@ -48,7 +48,7 @@ def getUserInfo():
     return ok(data, '成功')
 
 
-@users_bp.route('/api/toggleReceiveNoti', methods=['POST'])
+@users_bp.route('/api/users/me/notification', methods=['POST'])
 @jwt_required()
 def toggleReceiveNoti():
     payload = request.get_json(silent=True) or {}

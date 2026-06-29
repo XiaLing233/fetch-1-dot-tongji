@@ -149,8 +149,8 @@
         // 让后端清除 cookie
         try {
           await axios({
-          method: 'get',
-          url: '/api/logout',
+          method: 'delete',
+          url: '/api/auth/session',
           headers: {
             'X-CSRF-TOKEN': get_csrf_token(document.cookie)
           },
@@ -172,7 +172,7 @@
           try {
             await axios({
             method: 'get',
-            url: '/api/checkToken',
+            url: '/api/auth/check',
             headers: {
               'X-CSRF-TOKEN': get_csrf_token(document.cookie)
             },

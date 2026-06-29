@@ -24,7 +24,7 @@ public_bp = Blueprint('public', __name__)
 
 # ----- 路由 ----- #
 
-@public_bp.route('/api/getBackgroundImg', methods=['GET'])
+@public_bp.route('/api/background', methods=['GET'])
 def getBackgroundImg():
     img_path = current_app.config['IMG_PATH']
     img_num = len([name for name in os.listdir(img_path)
@@ -40,7 +40,7 @@ def getBackgroundImg():
     return ok(img, '成功')
 
 
-@public_bp.route('/api/getCaptcha', methods=['GET'])
+@public_bp.route('/api/captcha', methods=['GET'])
 def getCaptcha():
     user_ip = get_client_ip()
     redis_client = get_redis()
@@ -135,14 +135,14 @@ def _send_email_endpoint(xl_email, captcha_code, action):
         redis_client.delete(lock_key)
 
 
-@public_bp.route('/api/sendVerificationEmail', methods=['POST'])
+@public_bp.route('/api/verification/email', methods=['POST'])
 def sendVerificationEmail():
     xl_email = request.json.get('xl_email')
     captcha_code = request.json.get('captcha_code')
     return _send_email_endpoint(xl_email, captcha_code, 'register')
 
 
-@public_bp.route('/api/sendRecoveryEmail', methods=['POST'])
+@public_bp.route('/api/recovery/email', methods=['POST'])
 def sendRecoveryEmail():
     xl_email = request.json.get('xl_email')
     captcha_code = request.json.get('captcha_code')

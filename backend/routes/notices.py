@@ -13,8 +13,8 @@ notices_bp = Blueprint('notices', __name__)
 MYCOS = CosUpload()
 
 
-@notices_bp.route('/api/findMyCommonMsgPublish', methods=['GET'])
-def findMyCommonMsgPublish():
+@notices_bp.route('/api/notices', methods=['GET'])
+def listNotices():
     page = request.args.get('page', 1, type=int)
     page_size = request.args.get('pageSize', 20, type=int)
     search = request.args.get('search', '', type=str)
@@ -24,21 +24,19 @@ def findMyCommonMsgPublish():
     return ok_paginated(items, page, page_size, total, '成功')
 
 
-@notices_bp.route('/api/findMyCommonMsgPublishById', methods=['POST'])
+@notices_bp.route('/api/notices/<int:id>', methods=['GET'])
 @jwt_required()
-def findMyCommonMsgPublishById():
-    id = request.json.get('id')
+def getNotice(id):
     data = tjSql.sqlFindMyCommonMsgPublishById(id)
     return ok(data, '成功')
 
 
-@notices_bp.route('/api/downloadAttachmentByFileName', methods=['POST'])
+@notices_bp.route('/api/attachments/<path:filename>/download', methods=['GET'])
 @jwt_required()
-def downloadAttachmentByFileName():
-    fileLocation = request.json.get('fileLocation')
-    print("文件位置：", fileLocation)
+def downloadAttachment(filename):
+    print("文件位置：", filename)
 
-    filePath = myDecrypt.decryptFilePath(fileLocation)
+    filePath = myDecrypt.decryptFilePath(filename)
     print("文件路径：", filePath)
 
     ATTACHMENT_PATH = current_app.config.get('ATTACHMENT_PATH', './1dot')

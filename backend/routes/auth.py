@@ -19,7 +19,7 @@ from utils.helpers import (
 auth_bp = Blueprint('auth', __name__)
 
 
-@auth_bp.route('/api/register', methods=['POST'])
+@auth_bp.route('/api/auth/register', methods=['POST'])
 def register():
     xl_email = request.json.get('xl_email')
     xl_password = request.json.get('xl_password')
@@ -44,7 +44,7 @@ def register():
     return issue_jwt_cookie(xl_email, '注册成功')
 
 
-@auth_bp.route('/api/login', methods=['POST'])
+@auth_bp.route('/api/auth/login', methods=['POST'])
 def login():
     xl_email = request.json.get('xl_email')
     xl_password = request.json.get('xl_password')
@@ -75,7 +75,7 @@ def login():
     return issue_jwt_cookie(xl_email, '登录成功')
 
 
-@auth_bp.route('/api/recovery', methods=['POST'])
+@auth_bp.route('/api/auth/password/reset', methods=['PUT'])
 def recovery():
     xl_email = request.json.get('xl_email')
     xl_password = request.json.get('xl_password')
@@ -99,7 +99,7 @@ def recovery():
     return issue_jwt_cookie(xl_email, '密码修改成功')
 
 
-@auth_bp.route('/api/logout', methods=['GET'])
+@auth_bp.route('/api/auth/session', methods=['DELETE'])
 @jwt_required()
 def logout():
     from flask import jsonify
@@ -108,7 +108,7 @@ def logout():
     return response, 200
 
 
-@auth_bp.route('/api/checkToken', methods=['GET'])
+@auth_bp.route('/api/auth/check', methods=['GET'])
 @jwt_required()
 def checkToken():
     return ok(msg='成功')
