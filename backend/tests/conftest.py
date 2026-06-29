@@ -2,23 +2,29 @@
 
 import os
 import datetime
+import tempfile
+
 import pytest
+
+# 在 import app 之前生成测试密钥（crypto.py 在 import 时读取 PRIVATE_KEY_PATH）
+_KEYS_DIR = tempfile.mkdtemp(prefix='ftj_test_keys_')
+_PRI_PATH = os.path.join(_KEYS_DIR, 'pri.pem')
+_PUB_PATH = os.path.join(_KEYS_DIR, 'pub.pem')
+if not os.path.exists(_PRI_PATH):
+    from Crypto.PublicKey import RSA
+    _key = RSA.generate(2048)
+    with open(_PUB_PATH, 'wb') as f:
+        f.write(_key.publickey().export_key())
+    with open(_PRI_PATH, 'wb') as f:
+        f.write(_key.export_key())
+os.environ['RSA_PRIVATE_KEY_PATH'] = _PRI_PATH
 
 from app import create_app
 
 
 @pytest.fixture(scope='session')
-def rsa_keys(tmp_path_factory):
-    """生成临时 RSA 密钥对供测试使用。"""
-    from Crypto.PublicKey import RSA
-    key = RSA.generate(2048)
-    keys_dir = tmp_path_factory.mktemp('keys')
-    pub_path = keys_dir / 'pub.pem'
-    pri_path = keys_dir / 'pri.pem'
-    pub_path.write_bytes(key.publickey().export_key())
-    pri_path.write_bytes(key.export_key())
-    os.environ['RSA_PRIVATE_KEY_PATH'] = str(pri_path)
-    return str(pub_path), str(pri_path)
+def rsa_keys():
+    return _PUB_PATH, _PRI_PATH
 
 
 @pytest.fixture(scope='session')
