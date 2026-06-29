@@ -13,7 +13,7 @@
 ## 如何运行本项目
 
 1. 将项目 clone 下来;
-2. 在 `python-part` 文件夹下补充 `config.ini`, 模板参见 `python-part/README.md`;
+2. 在 `backend` 和 `crawler` 文件夹下补充 `config.ini`, 模板参见 `backend/README.md`;
 3. 补充 `config.ini` 中的敏感信息, 如 AES, COS, 邮箱, 密码等;
 4. 在 MySQL 中创建数据库, 具体命令如下所示;
 5. 安装必要的依赖. 在前端文件夹中运行 `npm install`, 在后端文件夹中**创建虚拟环境(建议)**, **激活虚拟环境后**运行 `pip install -r requirements.txt`;

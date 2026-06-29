@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master ]
     paths:
-      - "python-part/**"
+      - "backend/**"
   workflow_dispatch:
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
             cd ~/fetch-1-dot-tongji
             git fetch origin
             git reset --hard origin/master
-            cd python-part
+            cd backend
             source venv/bin/activate
             pip install -r requirements.txt
             sudo systemctl restart dotB.service

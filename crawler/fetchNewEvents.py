@@ -1,6 +1,11 @@
 # 获取 1 系统新发布的活动
 # 并将其存储到本地
 
+import sys
+import os
+# 添加 backend 目录到 sys.path，以便引用共享的 packages
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+
 from packages import myEncrypt # 用于加密密码
 from packages import loginout
 import time # 生成时间戳
