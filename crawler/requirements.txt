@@ -8,7 +8,7 @@ pycryptodome==3.21.0
 pytz==2024.2
 redis==5.2.1
 requests==2.33.0
-soupsieve==2.6
+soupsieve==2.8.4
 urllib3==2.7.0
 xmltodict==0.14.2
 pytest==8.3.5
