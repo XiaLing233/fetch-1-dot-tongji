@@ -6,7 +6,7 @@
         </div>
         <div class="edu-header-right">
           <div v-if="this.$store.state.isLoggedin" style="display: flex;">
-            <div class="edu-item" style="margin-top: 8px">
+            <div class="edu-item" style="display: flex; align-items: center;">
                 <el-text type="info">
                     {{ this.$store.state.userInfo.xl_login_log.length > 1 ? '上次登录：' : '首次登录' }}
                 </el-text>
@@ -14,10 +14,10 @@
                       {{ this.$store.state.userInfo.xl_login_log.length > 1 ? this.$store.state.userInfo.xl_login_log[1]['login_at'] : '' }}
                 </el-text>
               </div>
-            <div class="edu-item">
+            <div class="edu-item" style="display: flex; align-items: center;">
             <el-avatar :src="malePNG" size="default"></el-avatar>
           </div>
-          <div class="edu-item" style="margin-top: 12px" id="personalInfo">
+          <div class="edu-item" style="display: flex; align-items: center;" id="personalInfo">
             <el-dropdown>
               <span class="el-dropdown-link">
                 {{ this.$store.state.userInfo.xl_nickname }}

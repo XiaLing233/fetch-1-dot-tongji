@@ -85,59 +85,58 @@ def sqlFindMyCommonMsgTop():
 
 
 def sqlFindNotices(page=1, page_size=20, search='', status=''):
-    """分页查询通知，支持标题搜索和状态筛选。返回 (items, total_count)。"""
+    """分页查询通知，支持标题搜索和状态筛选。返回 (items, total_count)。
+
+    无筛选时置顶通知排在前面，通过 ORDER BY 统一排序+分页，
+    避免置顶项导致首页条数超过 page_size。
+    """
     with DB() as db:
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        where_parts = ["(invalid_top_time <= %s OR invalid_top_time IS NULL)"]
-        params = [now]
+        where_parts = []
+        params = []
+
+        if status == '置顶':
+            where_parts.append("invalid_top_time > %s")
+            params.append(now)
+        else:
+            # 有状态筛选或搜索时，排除当前置顶项（保持原行为）
+            if status or search:
+                where_parts.append("(invalid_top_time <= %s OR invalid_top_time IS NULL)")
+                params.append(now)
+
+            if status == '发布中':
+                where_parts.append("end_time > %s")
+                params.append(now)
+            elif status == '已过期':
+                where_parts.append("end_time <= %s")
+                params.append(now)
 
         if search:
             where_parts.append("title LIKE %s")
             params.append(f"%{search}%")
 
-        if status == '置顶':
-            where_parts = ["invalid_top_time > %s"]
-            params = [now]
-        elif status == '发布中':
-            where_parts.append("end_time > %s")
-            params.append(now)
-        elif status == '已过期':
-            where_parts.append("end_time <= %s")
-            params.append(now)
-
-        where = " AND ".join(where_parts)
-
-        # 置顶通知（无筛选时）
-        pinned = []
-        if status != '置顶' and not search:
-            cols = ', '.join(_NOTICE_COLS)
-            db.cursor.execute(
-                f"SELECT {cols} FROM notifications"
-                " WHERE invalid_top_time > %s ORDER BY publish_time DESC",
-                (now,)
-            )
-            pinned = [_format_notice_row(r) for r in db.cursor.fetchall()]
+        where = " AND ".join(where_parts) if where_parts else "1=1"
 
         # COUNT
         db.cursor.execute(
             f"SELECT COUNT(*) AS cnt FROM notifications WHERE {where}", params
         )
-        total = db.cursor.fetchone()[0] + len(pinned)
+        total = db.cursor.fetchone()[0]
 
-        # 分页
-        base_sql = (
+        # 分页：置顶优先（invalid_top_time > now 为真时排前面），再按发布时间倒序
+        sql = (
             "SELECT id, title, start_time, end_time, invalid_top_time,"
             " create_id, create_user, create_time, publish_time"
-            f" FROM notifications WHERE {where} ORDER BY publish_time DESC"
+            f" FROM notifications WHERE {where}"
+            " ORDER BY (invalid_top_time > %s) DESC, publish_time DESC"
             " LIMIT %s OFFSET %s"
         )
-        db.cursor.execute(base_sql, params + [page_size, (page - 1) * page_size])
+        db.cursor.execute(sql, params + [now, page_size, (page - 1) * page_size])
         items = [_format_notice_row(r) for r in db.cursor.fetchall()]
 
-    result = pinned + items if page == 1 else items
     print(f"[DB] 查询通知: page={page}, size={page_size}, search='{search}', status='{status}' → total={total}")
-    return result, total
+    return items, total
 
 
 def sqlFindAttachmentByNotificationId(notification_id):

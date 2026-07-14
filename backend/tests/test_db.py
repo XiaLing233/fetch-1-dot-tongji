@@ -1,12 +1,63 @@
 """数据库层测试。"""
 
 import uuid
+import datetime
+
+import pytest
 
 from db import tjSql
+from db.tjSql import DB
 
 
 def _uid():
     return uuid.uuid4().hex[:8]
+
+
+# ----- 分页测试辅助 -----
+
+# 使用大 ID 避免与正式数据冲突
+_TEST_ID_BASE = 9999900
+_test_id_counter = 0
+
+
+def _next_test_id():
+    global _test_id_counter
+    _test_id_counter += 1
+    return _TEST_ID_BASE + _test_id_counter
+
+
+def _now():
+    return datetime.datetime.now()
+
+
+def _future():
+    return (_now() + datetime.timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _past():
+    return '1970-01-01 00:00:00'
+
+
+def _insert_notice(db, nid, title, invalid_top_time, publish_time):
+    """插入一条测试通知。"""
+    sql = (
+        "INSERT INTO notifications (id, title, content, start_time, end_time,"
+        " invalid_top_time, create_id, create_user, create_time, publish_time)"
+        " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    )
+    db.cursor.execute(sql, (
+        nid, title, 'test content',
+        '2025-01-01 00:00:00', '2099-12-31 23:59:59',
+        invalid_top_time,
+        'test_creator_id', 'test_creator',
+        '2025-01-01 00:00:00', publish_time
+    ))
+
+
+def _cleanup_notices(db, ids):
+    """删除测试通知。"""
+    for nid in ids:
+        db.cursor.execute("DELETE FROM notifications WHERE id = %s", (nid,))
 
 
 class TestNotifications:
@@ -66,3 +117,150 @@ class TestUsers:
         logs = tjSql.sqlGetLoginLog(email)
         assert logs is not None
         assert any(log['ip_address'] == '192.168.1.1' for log in logs)
+
+
+class TestNoticesPagination:
+    """置顶排序与分页集成测试。
+
+    验证修复：置顶项通过 ORDER BY 统一排序，不再单独拼装，
+    确保每页返回条数严格等于 page_size。
+    """
+
+    def test_pinned_come_first(self):
+        """置顶通知应排在非置顶前面，同组内按 publish_time DESC 排序。"""
+        ids = []
+        with DB() as db:
+            ids.append(_next_test_id())
+            ids.append(_next_test_id())
+            ids.append(_next_test_id())
+            # 非置顶(最新) → 置顶 → 非置顶(最旧)
+            _insert_notice(db, ids[0], 'test_pagi_normal1', _past(), '2025-06-01 10:00:00')
+            _insert_notice(db, ids[1], 'test_pagi_pinned1', _future(), '2025-06-01 09:00:00')
+            _insert_notice(db, ids[2], 'test_pagi_normal2', _past(), '2025-06-01 08:00:00')
+
+        try:
+            items, _ = tjSql.sqlFindNotices(page=1, page_size=20)
+            test_items = [item for item in items if item['id'] in ids]
+
+            assert len(test_items) == 3, f"应查到 3 条测试数据，实际 {len(test_items)}"
+            # 置顶排第一
+            assert test_items[0]['id'] == ids[1], (
+                f"第一条应为置顶通知 (id={ids[1]})，实际 id={test_items[0]['id']}"
+            )
+            assert test_items[0]['status'] == '置顶'
+            # 非置顶按 publish_time DESC
+            assert test_items[1]['id'] == ids[0], "非置顶中 publish_time 更新的应排前面"
+            assert test_items[2]['id'] == ids[2], "非置顶中 publish_time 更旧的应排后面"
+        finally:
+            with DB() as db:
+                _cleanup_notices(db, ids)
+
+    def test_page_size_respected(self):
+        """每页返回的测试数据条数应等于 page_size（除最后一页外）。"""
+        ids = []
+        with DB() as db:
+            for i in range(5):
+                ids.append(_next_test_id())
+                _insert_notice(db, ids[-1], f'test_pagi_pin_{i}', _future(),
+                               f'2025-06-{(i+1):02d} 10:00:00')
+            for i in range(10):
+                ids.append(_next_test_id())
+                _insert_notice(db, ids[-1], f'test_pagi_norm_{i}', _past(),
+                               f'2025-05-{(i+1):02d} 10:00:00')
+
+        try:
+            page1, total = tjSql.sqlFindNotices(page=1, page_size=7)
+            page2, _ = tjSql.sqlFindNotices(page=2, page_size=7)
+            page3, _ = tjSql.sqlFindNotices(page=3, page_size=7)
+
+            p1_test = [i for i in page1 if i['id'] in ids]
+            p2_test = [i for i in page2 if i['id'] in ids]
+            p3_test = [i for i in page3 if i['id'] in ids]
+
+            assert len(p1_test) == 7, f"第 1 页应有 7 条，实际 {len(p1_test)}"
+            assert len(p2_test) == 7, f"第 2 页应有 7 条，实际 {len(p2_test)}"
+            assert len(p3_test) == 1, f"第 3 页应有 1 条（15 % 7 = 1），实际 {len(p3_test)}"
+
+            # 验证无重叠
+            p1_id_set = {i['id'] for i in p1_test}
+            p2_id_set = {i['id'] for i in p2_test}
+            p3_id_set = {i['id'] for i in p3_test}
+            assert p1_id_set.isdisjoint(p2_id_set), "第 1 页和第 2 页不应有重叠数据"
+            assert p1_id_set.isdisjoint(p3_id_set), "第 1 页和第 3 页不应有重叠数据"
+            assert p2_id_set.isdisjoint(p3_id_set), "第 2 页和第 3 页不应有重叠数据"
+        finally:
+            with DB() as db:
+                _cleanup_notices(db, ids)
+
+    def test_more_pinned_than_page_size(self):
+        """置顶数超过 page_size 时，首页仍严格返回 page_size 条，后续页补全剩余置顶。"""
+        ids = []
+        with DB() as db:
+            for i in range(8):
+                ids.append(_next_test_id())
+                _insert_notice(db, ids[-1], f'test_pagi_many_pin_{i}', _future(),
+                               f'2025-06-{(i+1):02d} 10:00:00')
+            for i in range(2):
+                ids.append(_next_test_id())
+                _insert_notice(db, ids[-1], f'test_pagi_many_norm_{i}', _past(),
+                               f'2025-05-{(i+1):02d} 10:00:00')
+
+        try:
+            page1, total = tjSql.sqlFindNotices(page=1, page_size=5)
+            page2, _ = tjSql.sqlFindNotices(page=2, page_size=5)
+
+            p1_test = [i for i in page1 if i['id'] in ids]
+            p2_test = [i for i in page2 if i['id'] in ids]
+
+            # 关键断言：之前 bug 会导致 page1 返回 8+5=13 条
+            assert len(p1_test) == 5, (
+                f"置顶 8 条 + page_size=5：首页应严格返回 5 条，实际 {len(p1_test)}"
+                f"（修复前 bug 会返回 13 条）"
+            )
+            assert len(p2_test) == 5, f"第 2 页应有 5 条，实际 {len(p2_test)}"
+
+            # 第 1 页全为置顶
+            assert all(item['status'] == '置顶' for item in p1_test), "第 1 页应全为置顶"
+
+            # 第 2 页：前 3 条置顶 + 后 2 条非置顶
+            pin_p2 = [item for item in p2_test if item['status'] == '置顶']
+            norm_p2 = [item for item in p2_test if item['status'] != '置顶']
+            assert len(pin_p2) == 3, f"第 2 页应有 3 条置顶，实际 {len(pin_p2)}"
+            assert len(norm_p2) == 2, f"第 2 页应有 2 条非置顶，实际 {len(norm_p2)}"
+        finally:
+            with DB() as db:
+                _cleanup_notices(db, ids)
+
+    def test_different_page_sizes(self):
+        """不同 page_size（3/5/10/20）下每页条数正确，且置顶始终优先。"""
+        ids = []
+        with DB() as db:
+            for i in range(6):
+                ids.append(_next_test_id())
+                _insert_notice(db, ids[-1], f'test_pagi_size_pin_{i}', _future(),
+                               f'2025-06-{(i+1):02d} 10:00:00')
+            for i in range(8):
+                ids.append(_next_test_id())
+                _insert_notice(db, ids[-1], f'test_pagi_size_norm_{i}', _past(),
+                               f'2025-05-{(i+1):02d} 10:00:00')
+
+        try:
+            for ps in [3, 5, 10, 20]:
+                page1, _ = tjSql.sqlFindNotices(page=1, page_size=ps)
+                p1_test = [i for i in page1 if i['id'] in ids]
+
+                expected = min(ps, len(ids))
+                assert len(p1_test) == expected, (
+                    f"page_size={ps}：首页应有 {expected} 条测试数据，实际 {len(p1_test)}"
+                )
+
+                # 验证置顶始终在非置顶之前
+                seen_normal = False
+                for item in p1_test:
+                    if item['status'] != '置顶':
+                        seen_normal = True
+                    elif seen_normal:
+                        pytest.fail(f"page_size={ps}：置顶项不应出现在非置顶项之后")
+        finally:
+            with DB() as db:
+                _cleanup_notices(db, ids)
