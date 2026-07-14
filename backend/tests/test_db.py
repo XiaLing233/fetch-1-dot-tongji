@@ -38,8 +38,16 @@ def _past():
     return '1970-01-01 00:00:00'
 
 
-def _insert_notice(db, nid, title, invalid_top_time, publish_time):
-    """插入一条测试通知。"""
+def _insert_notice(db, nid, title, invalid_top_time, publish_time,
+                   end_time=None, start_time=None, create_id='test_creator_id',
+                   create_user='test_creator', create_time=None):
+    """插入一条测试通知。invalid_top_time 支持 None（NULL）、_future()、_past()。"""
+    if end_time is None:
+        end_time = '2099-12-31 23:59:59'
+    if start_time is None:
+        start_time = '2025-01-01 00:00:00'
+    if create_time is None:
+        create_time = '2025-01-01 00:00:00'
     sql = (
         "INSERT INTO notifications (id, title, content, start_time, end_time,"
         " invalid_top_time, create_id, create_user, create_time, publish_time)"
@@ -47,10 +55,10 @@ def _insert_notice(db, nid, title, invalid_top_time, publish_time):
     )
     db.cursor.execute(sql, (
         nid, title, 'test content',
-        '2025-01-01 00:00:00', '2099-12-31 23:59:59',
+        start_time, end_time,
         invalid_top_time,
-        'test_creator_id', 'test_creator',
-        '2025-01-01 00:00:00', publish_time
+        create_id, create_user,
+        create_time, publish_time
     ))
 
 
@@ -261,6 +269,70 @@ class TestNoticesPagination:
                         seen_normal = True
                     elif seen_normal:
                         pytest.fail(f"page_size={ps}：置顶项不应出现在非置顶项之后")
+        finally:
+            with DB() as db:
+                _cleanup_notices(db, ids)
+
+    def test_null_invalid_top_time_sorts_correctly(self):
+        """两层排序：置顶层先（按 publish_time DESC），非置顶层后（按 publish_time DESC）。
+
+        非置顶层包含三种 invalid_top_time：NULL、1970-01-01（默认）、已过期。
+        修复前 NULL 因 MySQL 排序异常被排到非置顶层末尾。
+        """
+        ids = []
+        with DB() as db:
+            # ===== 置顶层（未来 invalid_top_time）=====
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'real_pinned_1', _future(),
+                           '2026-07-06 09:09:43')
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'real_pinned_2', _future(),
+                           '2026-06-25 09:31:18')
+
+            # ===== 非置顶层 =====
+            # NULL（从未置顶，publish 最新）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'real_null_top_1', None,
+                           '2026-07-14 13:51:48')
+            # 默认 1970-01-01（从未置顶，publish 介于两个 NULL 之间）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'real_normal_1', _past(),
+                           '2026-07-13 20:00:00')
+            # NULL（publish 稍旧）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'real_null_top_2', None,
+                           '2026-07-13 19:25:41')
+            # 过期置顶（过去 invalid_top_time，归入非置顶层，publish 最旧）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'real_expired_pin_1', '2026-07-01 00:00:00',
+                           '2026-06-10 08:33:20')
+
+        try:
+            items, _ = tjSql.sqlFindNotices(page=1, page_size=20)
+            test_items = [item for item in items if item['id'] in ids]
+            assert len(test_items) == 6, f"应查到 6 条测试数据，实际 {len(test_items)}"
+
+            # 完整顺序：
+            # #1 置顶 (pub=07-06)
+            # #2 置顶 (pub=06-25)
+            # #3 NULL (pub=07-14)      ← 非置顶中 publish 最新
+            # #4 默认 (pub=07-13 20:00) ← 介于两个 NULL 之间
+            # #5 NULL (pub=07-13 19:25)
+            # #6 过期置顶 (pub=06-10)   ← 非置顶中 publish 最旧
+            order = [
+                (item['status'] == '置顶',
+                 item['invalid_top_time'],
+                 item['publish_time'])
+                for item in test_items
+            ]
+
+            assert order[0] == (True,  _future(), '2026-07-06 09:09:43'), f"#1 {order[0]}"
+            assert order[1] == (True,  _future(), '2026-06-25 09:31:18'), f"#2 {order[1]}"
+            assert order[2] == (False, None,      '2026-07-14 13:51:48'), f"#3 {order[2]}"
+            assert order[3] == (False, _past(),   '2026-07-13 20:00:00'), f"#4 {order[3]}"
+            assert order[4] == (False, None,      '2026-07-13 19:25:41'), f"#5 {order[4]}"
+            assert order[5] == (False, '2026-07-01 00:00:00',
+                                '2026-06-10 08:33:20'), f"#6 {order[5]}"
         finally:
             with DB() as db:
                 _cleanup_notices(db, ids)

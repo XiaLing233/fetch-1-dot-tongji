@@ -125,11 +125,14 @@ def sqlFindNotices(page=1, page_size=20, search='', status=''):
         total = db.cursor.fetchone()[0]
 
         # 分页：置顶优先（invalid_top_time > now 为真时排前面），再按发布时间倒序
+        # 使用 IS NOT NULL AND 确保 NULL 值返回 FALSE(0) 而非 NULL，
+        # 避免 MySQL ORDER BY DESC 中 NULL 排序不一致
         sql = (
             "SELECT id, title, start_time, end_time, invalid_top_time,"
             " create_id, create_user, create_time, publish_time"
             f" FROM notifications WHERE {where}"
-            " ORDER BY (invalid_top_time > %s) DESC, publish_time DESC"
+            " ORDER BY (invalid_top_time IS NOT NULL AND invalid_top_time > %s) DESC,"
+            " publish_time DESC"
             " LIMIT %s OFFSET %s"
         )
         db.cursor.execute(sql, params + [now, page_size, (page - 1) * page_size])
