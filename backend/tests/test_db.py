@@ -336,3 +336,162 @@ class TestNoticesPagination:
         finally:
             with DB() as db:
                 _cleanup_notices(db, ids)
+
+    def test_posting_filter_includes_pinned(self):
+        """筛选 '发布中' 时应包含置顶项（其 end_time 也在未来），置顶排最前。"""
+        ids = []
+        with DB() as db:
+            # 置顶 + 发布中（end_time 在未来）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'pin_post', _future(),
+                           '2026-07-06 09:00:00', end_time='2026-12-31 00:00:00')
+            # 普通发布中（非置顶）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'norm_post', _past(),
+                           '2026-07-10 10:00:00', end_time='2026-12-31 00:00:00')
+            # 已过期（不应出现在发布中筛选结果里）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'expired', _past(),
+                           '2026-06-01 08:00:00', end_time='2026-01-01 00:00:00')
+
+        try:
+            items, total = tjSql.sqlFindNotices(page=1, page_size=20, statuses=['发布中'])
+            test_items = [item for item in items if item['id'] in ids]
+
+            # 应返回 2 条：置顶+发布中 和 普通发布中，不包含已过期
+            assert len(test_items) == 2, (
+                f"筛选'发布中'应返回 2 条测试数据，实际 {len(test_items)}"
+                f"（修复前会排除置顶项只返回 1 条）"
+            )
+            # 置顶排第一
+            assert test_items[0]['status'] == '置顶', f"置顶+发布中应排第一，实际 {test_items[0]['status']}"
+            # 第二是普通发布中
+            assert test_items[1]['status'] == '发布中', f"普通发布中应排第二，实际 {test_items[1]['status']}"
+            # 确保 total 正确
+            assert total >= 2
+        finally:
+            with DB() as db:
+                _cleanup_notices(db, ids)
+
+    def test_multi_status_filter(self):
+        """多选状态（置顶 + 发布中）用 OR 拼接"""
+        ids = []
+        with DB() as db:
+            # 置顶
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'pin_only', _future(),
+                           '2026-07-06 09:00:00', end_time='2026-12-31 00:00:00')
+            # 发布中（非置顶）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'post_only', _past(),
+                           '2026-07-10 10:00:00', end_time='2026-12-31 00:00:00')
+            # 已过期（不应出现）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'exp_only', _past(),
+                           '2026-06-01 08:00:00', end_time='2026-01-01 00:00:00')
+
+        try:
+            # 多选：置顶 + 发布中
+            items, _ = tjSql.sqlFindNotices(page=1, page_size=20,
+                                            statuses=['置顶', '发布中'])
+            test_items = [item for item in items if item['id'] in ids]
+            assert len(test_items) == 2, f"多选(置顶+发布中)应返回 2 条，实际 {len(test_items)}"
+            assert test_items[0]['status'] == '置顶'
+            assert test_items[1]['status'] == '发布中'
+
+            # 空列表 = 无筛选
+            items3, _ = tjSql.sqlFindNotices(page=1, page_size=20, statuses=[])
+            test_items3 = [item for item in items3 if item['id'] in ids]
+            assert len(test_items3) == 3, f"空列表应返回 3 条，实际 {len(test_items3)}"
+        finally:
+            with DB() as db:
+                _cleanup_notices(db, ids)
+
+    def test_pinned_and_outdated_filter(self):
+        """多选 置顶 + 已过期：应返回置顶项和已过期项，不含发布中。"""
+        ids = []
+        with DB() as db:
+            # 置顶
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'pin_out_1', _future(),
+                           '2026-07-06 09:00:00', end_time='2026-12-31 00:00:00')
+            # 发布中（不应出现）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'post_out_1', _past(),
+                           '2026-07-10 10:00:00', end_time='2026-12-31 00:00:00')
+            # 已过期
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'exp_out_1', _past(),
+                           '2026-06-01 08:00:00', end_time='2026-01-01 00:00:00')
+
+        try:
+            items, _ = tjSql.sqlFindNotices(page=1, page_size=20,
+                                            statuses=['置顶', '已过期'])
+            test_items = [item for item in items if item['id'] in ids]
+            assert len(test_items) == 2, f"多选(置顶+已过期)应返回 2 条，实际 {len(test_items)}"
+            assert test_items[0]['status'] == '置顶', f"置顶应排第一，实际 {test_items[0]['status']}"
+            assert test_items[1]['status'] == '已过期', f"已过期应排第二，实际 {test_items[1]['status']}"
+        finally:
+            with DB() as db:
+                _cleanup_notices(db, ids)
+
+    def test_outdated_and_posting_filter(self):
+        """多选 已过期 + 发布中：置顶项总是发布中（end_time 在未来），
+        因此也会匹配发布中条件，最终返回全部三种 status。"""
+        ids = []
+        with DB() as db:
+            # 已过期
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'exp_post_1', _past(),
+                           '2026-06-01 08:00:00', end_time='2026-01-01 00:00:00')
+            # 发布中（非置顶）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'post_exp_1', _past(),
+                           '2026-07-10 10:00:00', end_time='2026-12-31 00:00:00')
+            # 置顶（总是发布中，匹配发布中条件）
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'pin_exp_1', _future(),
+                           '2026-07-06 09:00:00', end_time='2026-12-31 00:00:00')
+
+        try:
+            items, _ = tjSql.sqlFindNotices(page=1, page_size=20,
+                                            statuses=['已过期', '发布中'])
+            test_items = [item for item in items if item['id'] in ids]
+            # 已过期 1 条 + 发布中(含置顶) 2 条 = 3 条
+            assert len(test_items) == 3, f"多选(已过期+发布中)应返回 3 条，实际 {len(test_items)}"
+            # 置顶排第一
+            assert test_items[0]['status'] == '置顶'
+            assert {item['status'] for item in test_items[1:]} == {'已过期', '发布中'}
+        finally:
+            with DB() as db:
+                _cleanup_notices(db, ids)
+
+    def test_all_three_statuses_equals_no_filter(self):
+        """全选三个状态 = 与空列表等效，返回所有项。"""
+        ids = []
+        with DB() as db:
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'all_pin', _future(),
+                           '2026-07-06 09:00:00', end_time='2026-12-31 00:00:00')
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'all_post', _past(),
+                           '2026-07-10 10:00:00', end_time='2026-12-31 00:00:00')
+            ids.append(_next_test_id())
+            _insert_notice(db, ids[-1], 'all_exp', _past(),
+                           '2026-06-01 08:00:00', end_time='2026-01-01 00:00:00')
+
+        try:
+            items_all, _ = tjSql.sqlFindNotices(page=1, page_size=20,
+                                                statuses=['置顶', '发布中', '已过期'])
+            items_none, _ = tjSql.sqlFindNotices(page=1, page_size=20, statuses=[])
+
+            test_all = [item for item in items_all if item['id'] in ids]
+            test_none = [item for item in items_none if item['id'] in ids]
+
+            assert len(test_all) == 3, f"全选三状态应返回 3 条，实际 {len(test_all)}"
+            assert len(test_none) == 3, f"无筛选应返回 3 条，实际 {len(test_none)}"
+            # 两者顺序一致
+            assert [item['id'] for item in test_all] == [item['id'] for item in test_none]
+        finally:
+            with DB() as db:
+                _cleanup_notices(db, ids)

@@ -208,7 +208,7 @@
                     pageSize: this.pagi.pageSize,
                 }
                 if (this.statusFilter.length > 0) {
-                    params.status = this.statusFilter[0]
+                    params.status = this.statusFilter
                 }
                 if (this.search) {
                     params.search = this.search
@@ -217,6 +217,7 @@
                     url: '/api/notices',
                     method: 'get',
                     params,
+                    paramsSerializer: { indexes: null },
                 })
                 .then(res => {
                     this.isLoading = false
