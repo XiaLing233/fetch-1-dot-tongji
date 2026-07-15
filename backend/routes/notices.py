@@ -18,9 +18,9 @@ def listNotices():
     page = request.args.get('page', 1, type=int)
     page_size = request.args.get('pageSize', 20, type=int)
     search = request.args.get('search', '', type=str)
-    status = request.args.get('status', '', type=str)
+    statuses = request.args.getlist('status')  # 支持多选：?status=置顶&status=发布中
 
-    items, total = tjSql.sqlFindNotices(page, page_size, search, status)
+    items, total = tjSql.sqlFindNotices(page, page_size, search, statuses)
     return ok_paginated(items, page, page_size, total, '成功')
 
 

@@ -84,33 +84,34 @@ def sqlFindMyCommonMsgTop():
         return [dict(zip(db.cursor.column_names, row)) for row in db.cursor.fetchall()]
 
 
-def sqlFindNotices(page=1, page_size=20, search='', status=''):
-    """分页查询通知，支持标题搜索和状态筛选。返回 (items, total_count)。
+def sqlFindNotices(page=1, page_size=20, search='', statuses=None):
+    """分页查询通知，支持标题搜索和状态多选筛选。返回 (items, total_count)。
 
-    无筛选时置顶通知排在前面，通过 ORDER BY 统一排序+分页，
-    避免置顶项导致首页条数超过 page_size。
+    statuses: 状态列表，如 ['置顶', '发布中']，OR 拼接；空列表或无筛选时返回全部。
+    通过 ORDER BY 统一排序+分页，置顶项始终排在最前。
     """
+    if statuses is None:
+        statuses = []
+
     with DB() as db:
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         where_parts = []
         params = []
 
-        if status == '置顶':
-            where_parts.append("invalid_top_time > %s")
+        # 状态筛选：多个状态用 OR 连接
+        status_ors = []
+        if '置顶' in statuses:
+            status_ors.append("invalid_top_time > %s")
             params.append(now)
-        else:
-            # 有状态筛选或搜索时，排除当前置顶项（保持原行为）
-            if status or search:
-                where_parts.append("(invalid_top_time <= %s OR invalid_top_time IS NULL)")
-                params.append(now)
-
-            if status == '发布中':
-                where_parts.append("end_time > %s")
-                params.append(now)
-            elif status == '已过期':
-                where_parts.append("end_time <= %s")
-                params.append(now)
+        if '发布中' in statuses:
+            status_ors.append("end_time > %s")
+            params.append(now)
+        if '已过期' in statuses:
+            status_ors.append("end_time <= %s")
+            params.append(now)
+        if status_ors:
+            where_parts.append("(" + " OR ".join(status_ors) + ")")
 
         if search:
             where_parts.append("title LIKE %s")
@@ -125,17 +126,20 @@ def sqlFindNotices(page=1, page_size=20, search='', status=''):
         total = db.cursor.fetchone()[0]
 
         # 分页：置顶优先（invalid_top_time > now 为真时排前面），再按发布时间倒序
+        # 使用 IS NOT NULL AND 确保 NULL 值返回 FALSE(0) 而非 NULL，
+        # 避免 MySQL ORDER BY DESC 中 NULL 排序不一致
         sql = (
             "SELECT id, title, start_time, end_time, invalid_top_time,"
             " create_id, create_user, create_time, publish_time"
             f" FROM notifications WHERE {where}"
-            " ORDER BY (invalid_top_time > %s) DESC, publish_time DESC"
+            " ORDER BY (invalid_top_time IS NOT NULL AND invalid_top_time > %s) DESC,"
+            " publish_time DESC"
             " LIMIT %s OFFSET %s"
         )
         db.cursor.execute(sql, params + [now, page_size, (page - 1) * page_size])
         items = [_format_notice_row(r) for r in db.cursor.fetchall()]
 
-    print(f"[DB] 查询通知: page={page}, size={page_size}, search='{search}', status='{status}' → total={total}")
+    print(f"[DB] 查询通知: page={page}, size={page_size}, search='{search}', statuses={statuses} → total={total}")
     return items, total
 
 
