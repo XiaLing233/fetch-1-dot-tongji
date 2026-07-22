@@ -6,7 +6,7 @@ Flask-Session==0.8.0
 gevent==24.11.1
 gunicorn==23.0.0
 mysql-connector-python==9.2.0
-pillow==12.2.0
+pillow==12.3.0
 pycryptodome==3.21.0
 python-dotenv==1.2.2
 
